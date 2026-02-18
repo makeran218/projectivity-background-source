@@ -124,7 +124,7 @@ class MediaGenerator:
         brand_logo = brand_logo.resize((int(brand_logo.width * (log_h/brand_logo.height)), log_h))
         bckg.alpha_composite(brand_logo, (label_pos[0], bbox[3] + 20))
 
-        # Media Logo Logic (SVG/PNG)
+        # Media Logo Logic
         logo_path = self.get_media_logo(m_type, m_id)
         logo_img = None
         if logo_path:
@@ -145,11 +145,16 @@ class MediaGenerator:
             f_title = self.get_font(190, title)
             draw.text((200, 420), title, font=f_title, fill="white")
 
-        bckg.convert("RGB").save(os.path.join(BACKGROUND_DIR, f"{m_type}_tmdb_{m_id}.jpg"), "JPEG")
+        # --- OPTIMIZATION STEP ---
+        # Convert to RGB, save as JPEG with quality 85 and optimization turned on
+        output_path = os.path.join(BACKGROUND_DIR, f"{m_type}_tmdb_{m_id}.jpg")
+        bckg.convert("RGB").save(output_path, "JPEG", quality=85, optimize=True)
 
     def generate_api_json(self):
         api_data = []
-        for filename in os.listdir(BACKGROUND_DIR):
+        # Sort files so the JSON isn't jumbled
+        filenames = sorted(os.listdir(BACKGROUND_DIR))
+        for filename in filenames:
             if filename.endswith(".jpg"):
                 name = os.path.splitext(filename)[0]
                 last_u = name.rfind('_')
@@ -158,7 +163,8 @@ class MediaGenerator:
                     "imageUrl": f"{BASE_URL_FOR_API}/{BACKGROUND_DIR}/{filename}",
                     "title": name
                 })
-        with open("api.json", "w") as f: json.dump(api_data, f, indent=4)
+        with open("api.json", "w") as f:
+            json.dump(api_data, f, indent=4)
 
     def run(self, service_key, is_movie, custom_label, limit=5, is_new_release=False):
         svc = SERVICES[service_key]
