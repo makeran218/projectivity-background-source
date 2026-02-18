@@ -73,56 +73,49 @@ class MediaGenerator:
 
 
     def get_media_logo(self, media_type, media_id):
-        # API call focused on English and Universal (null) logos
         url = f"{TMDB_BASE_URL}/{media_type}/{media_id}/images?include_image_language=en,null"
         try:
             response = requests.get(url, headers=HEADERS).json()
             all_logos = response.get("logos", [])
 
-            # Priority 1: English logos. Priority 2: Universal logos (None)
-            targeted_logos = [l for l in all_logos if l.get("iso_639_1") == "en"]
-            if not targeted_logos:
-                targeted_logos = [l for l in all_logos if l.get("iso_639_1") is None]
+            # Priority: English -> Universal
+            targeted = [l for l in all_logos if l.get("iso_639_1") == "en"]
+            if not targeted:
+                targeted = [l for l in all_logos if l.get("iso_639_1") is None]
 
-            # Take the top 3 by popularity for analysis
-            top_3 = sorted(targeted_logos, key=lambda x: x.get("vote_average", 0), reverse=True)[:3]
+            top_3 = sorted(targeted, key=lambda x: x.get("vote_average", 0), reverse=True)[:3]
             if not top_3: return None
 
-            best_logo_path = None
-            highest_brightness = 0
+            best_path = None
+            highest_bright = 0
 
             for logo in top_3:
                 path = logo['file_path']
                 l_res = requests.get(f"https://image.tmdb.org/t/p/original{path}")
 
-                # --- SVG to PNG Conversion for analysis ---
                 if path.lower().endswith('.svg'):
                     drawing = svg2rlg(BytesIO(l_res.content))
                     mem = BytesIO()
-                    renderPM.drawToFile(drawing, mem, fmt="PNG")
+                    # bg=None is the critical fix here
+                    renderPM.drawToFile(drawing, mem, fmt="PNG", bg=None)
                     img = Image.open(mem).convert("RGBA")
                 else:
                     img = Image.open(BytesIO(l_res.content)).convert("RGBA")
 
-                # --- Fast Brightness Check ---
+                # Brightness check using the actual transparency mask
                 alpha = img.split()[3]
-                # Use mean to find average brightness of non-transparent pixels
                 stat = ImageStat.Stat(img.convert("RGB"), mask=alpha)
-                avg_brightness = sum(stat.mean) / 3 if stat.mean else 0
 
-                # If it's a clear white logo, return immediately
-                if avg_brightness > 220:
-                    return path
+                # Mean brightness of visible pixels
+                avg_b = sum(stat.mean) / 3 if stat.mean else 0
 
-                # Track the brightest logo in the top 3
-                if avg_brightness > highest_brightness:
-                    highest_brightness = avg_brightness
-                    best_logo_path = path
+                if avg_b > 220: return path # Found white, stop here
+                if avg_b > highest_bright:
+                    highest_bright = avg_b
+                    best_path = path
 
-            return best_logo_path if best_logo_path else top_3[0]["file_path"]
-
-        except Exception as e:
-            print(f"Logo Processing Error: {e}")
+            return best_path if best_path else top_3[0]["file_path"]
+        except:
             return None
 
     def generate_image(self, item, is_movie, service_key, custom_label):
