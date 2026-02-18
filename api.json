@@ -40,6 +40,11 @@
         "title": "tv_tmdb_91239"
     },
     {
+        "actionUrl": "tv_tmdb:157741",
+        "imageUrl": "https://raw.githubusercontent.com/makeran218/projectivity-background-source/main/tmdb_backgrounds/tv_tmdb_157741.jpg",
+        "title": "tv_tmdb_157741"
+    },
+    {
         "actionUrl": "movie_tmdb:295830",
         "imageUrl": "https://raw.githubusercontent.com/makeran218/projectivity-background-source/main/tmdb_backgrounds/movie_tmdb_295830.jpg",
         "title": "movie_tmdb_295830"
@@ -143,11 +148,6 @@
         "actionUrl": "movie_tmdb:1287141",
         "imageUrl": "https://raw.githubusercontent.com/makeran218/projectivity-background-source/main/tmdb_backgrounds/movie_tmdb_1287141.jpg",
         "title": "movie_tmdb_1287141"
-    },
-    {
-        "actionUrl": "tv_tmdb:67198",
-        "imageUrl": "https://raw.githubusercontent.com/makeran218/projectivity-background-source/main/tmdb_backgrounds/tv_tmdb_67198.jpg",
-        "title": "tv_tmdb_67198"
     },
     {
         "actionUrl": "movie_tmdb:1061990",
