@@ -188,18 +188,22 @@ if __name__ == "__main__":
     bot.run(service_key="netflix", is_movie=True, custom_label="New Release on ", limit=5, is_new_release=True)
     bot.run(service_key="netflix", is_movie=False, custom_label="New Release on ", limit=5, is_new_release=True)
     bot.run(service_key="netflix", is_movie=True, custom_label="Popular on ", limit=5, is_new_release=False)
+    bot.run(service_key="netflix", is_movie=False, custom_label="Popular on ", limit=5, is_new_release=False)
 
     # Paramount
     bot.run(service_key="paramount", is_movie=True, custom_label="New Release on ", limit=5, is_new_release=True)
     bot.run(service_key="paramount", is_movie=False, custom_label="New Release on ", limit=5, is_new_release=True)
     bot.run(service_key="paramount", is_movie=True, custom_label="Popular on ", limit=5, is_new_release=False)
+    bot.run(service_key="paramount", is_movie=False, custom_label="Popular on ", limit=5, is_new_release=False)
 
     # Amazon
     bot.run(service_key="amazon", is_movie=True, custom_label="New Release on ", limit=5, is_new_release=True)
     bot.run(service_key="amazon", is_movie=False, custom_label="New Release on ", limit=5, is_new_release=True)
     bot.run(service_key="amazon", is_movie=True, custom_label="Popular on ", limit=5, is_new_release=False)
+    bot.run(service_key="amazon", is_movie=False, custom_label="Popular on ", limit=5, is_new_release=False)
 
     #peacock
     bot.run(service_key="peacock", is_movie=True, custom_label="New Release on ", limit=5, is_new_release=True)
     bot.run(service_key="peacock", is_movie=False, custom_label="New Release on ", limit=5, is_new_release=True)
     bot.run(service_key="peacock", is_movie=True, custom_label="Popular on ", limit=5, is_new_release=False)
+    bot.run(service_key="peacock", is_movie=False, custom_label="Popular on ", limit=5, is_new_release=False)
