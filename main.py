@@ -75,34 +75,47 @@ class MediaGenerator:
         url = f"{TMDB_BASE_URL}/{media_type}/{media_id}/images"
         try:
             response = requests.get(url, headers=HEADERS).json()
-            # Sort by vote average and take top 3
-            logos = sorted(response.get("logos", []), key=lambda x: x.get("vote_average", 0), reverse=True)[:3]
+            all_logos = response.get("logos", [])
 
-            if not logos:
+            # 1. Filter by Language (Priority: en -> None -> Others)
+            # We look for 'en' specifically for US-style logos
+            targeted_logos = [l for l in all_logos if l.get("iso_639_1") == "en"]
+
+            # If no English logos, fallback to 'null' (often textless or global logos)
+            if not targeted_logos:
+                targeted_logos = [l for l in all_logos if l.get("iso_639_1") is None]
+
+            # 2. Sort by popularity and take the top 3
+            top_3 = sorted(targeted_logos, key=lambda x: x.get("vote_average", 0), reverse=True)[:3]
+
+            if not top_3:
                 return None
 
-            for logo in logos:
-                logo_url = f"https://image.tmdb.org/t/p/w500{logo['file_path']}" # Using w500 for faster check
+            for logo in top_3:
+                # Use w500 for faster download during the "White Check"
+                logo_url = f"https://image.tmdb.org/t/p/w500{logo['file_path']}"
                 l_res = requests.get(logo_url)
                 img = Image.open(BytesIO(l_res.content)).convert("RGBA")
 
-                # FAST BRIGHTNESS CHECK:
-                # We split the alpha channel to only calculate brightness of visible pixels
+                # 3. Fast White Check using Masking
+                # This only looks at the pixels that aren't transparent
+                alpha = img.split()[3]
                 rgb_img = img.convert("RGB")
-                stat = ImageStat.Stat(rgb_img, mask=img.split()[3]) # Uses Alpha channel as mask
+                stat = ImageStat.Stat(rgb_img, mask=alpha)
 
-                # RMS (Root Mean Square) is a great proxy for perceived brightness
-                # Each channel (R, G, B) will have an RMS value. Average them.
-                brightness = sum(stat.rms) / 3
+                # Calculate average brightness across R, G, B
+                # stat.mean returns a list: [avg_r, avg_g, avg_b]
+                avg_brightness = sum(stat.mean) / 3
 
-                # 200 is the 'white' threshold. If found, return immediately to save time.
-                if brightness > 200:
+                # If the logo is bright (White/Silver), return it immediately
+                if avg_brightness > 200:
                     return logo["file_path"]
 
-            # Fallback to the #1 popular logo if none pass the 'white' threshold
-            return logos[0]["file_path"]
+            # 4. Fallback: If no "White" logo found in Top 3, use the #1 English logo
+            return top_3[0]["file_path"]
+
         except Exception as e:
-            print(f"Logo search error: {e}")
+            print(f"Error fetching logo for {media_id}: {e}")
             return None
 
     def generate_image(self, item, is_movie, service_key, custom_label):
