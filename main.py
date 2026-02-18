@@ -1,5 +1,5 @@
 import requests
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageStat
 from io import BytesIO
 import os
 import shutil
@@ -73,10 +73,37 @@ class MediaGenerator:
 
     def get_media_logo(self, media_type, media_id):
         url = f"{TMDB_BASE_URL}/{media_type}/{media_id}/images"
-        response = requests.get(url, headers=HEADERS).json()
-        logos = [l for l in response.get("logos", []) if l.get("iso_639_1") == LANGUAGE.split('-')[0]]
-        if not logos: logos = [l for l in response.get("logos", []) if l.get("iso_639_1") == "en"]
-        return sorted(logos, key=lambda x: x.get("vote_average", 0), reverse=True)[0]["file_path"] if logos else None
+        try:
+            response = requests.get(url, headers=HEADERS).json()
+            # Sort by vote average and take top 3
+            logos = sorted(response.get("logos", []), key=lambda x: x.get("vote_average", 0), reverse=True)[:3]
+
+            if not logos:
+                return None
+
+            for logo in logos:
+                logo_url = f"https://image.tmdb.org/t/p/w500{logo['file_path']}" # Using w500 for faster check
+                l_res = requests.get(logo_url)
+                img = Image.open(BytesIO(l_res.content)).convert("RGBA")
+
+                # FAST BRIGHTNESS CHECK:
+                # We split the alpha channel to only calculate brightness of visible pixels
+                rgb_img = img.convert("RGB")
+                stat = ImageStat.Stat(rgb_img, mask=img.split()[3]) # Uses Alpha channel as mask
+
+                # RMS (Root Mean Square) is a great proxy for perceived brightness
+                # Each channel (R, G, B) will have an RMS value. Average them.
+                brightness = sum(stat.rms) / 3
+
+                # 200 is the 'white' threshold. If found, return immediately to save time.
+                if brightness > 200:
+                    return logo["file_path"]
+
+            # Fallback to the #1 popular logo if none pass the 'white' threshold
+            return logos[0]["file_path"]
+        except Exception as e:
+            print(f"Logo search error: {e}")
+            return None
 
     def generate_image(self, item, is_movie, service_key, custom_label):
         m_type, m_id = ("movie" if is_movie else "tv"), item['id']
@@ -170,35 +197,28 @@ class MediaGenerator:
         svc = SERVICES[service_key]
         m_type = "movie" if is_movie else "tv"
 
-        # 1. Base URL and standard params
+        # 1. Dynamic URL Generation
         if svc["type"] == "network":
             param = "with_companies" if is_movie else "with_networks"
             url = f"{TMDB_BASE_URL}/discover/{m_type}?{param}={svc['id']}"
 
-            # 2. Logic to handle "New Release" vs "Popular"
             if is_new_release:
-                # Get date from 60 days ago
-                min_date = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')
-                max_date = datetime.now().strftime('%Y-%m-%d')
-
-                if is_movie:
-                    url += f"&primary_release_date.gte={min_date}&primary_release_date.lte={max_date}&sort_by=primary_release_date.desc"
-                else:
-                    url += f"&first_air_date.gte={min_date}&first_air_date.lte={max_date}&sort_by=first_air_date.desc"
+                # 60 day window for New Releases
+                date_min = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')
+                date_key = "primary_release_date" if is_movie else "first_air_date"
+                url += f"&{date_key}.gte={date_min}&sort_by={date_key}.desc"
             else:
                 url += "&sort_by=popularity.desc"
         else:
             url = f"{TMDB_BASE_URL}/trending/{m_type}/week"
 
-        # Fetch and process
-        response = requests.get(url, headers=HEADERS).json()
-        results = response.get('results', [])
-
+        # 2. Limit processing
+        results = requests.get(url, headers=HEADERS).json().get('results', [])
         for item in results[:limit]:
             try:
                 self.generate_image(item, is_movie, service_key, custom_label)
             except Exception as e:
-                print(f"Error processing {item.get('title', 'Unknown')}: {e}")
+                print(f"Skipping {item.get('id')}: {e}")
 
         self.generate_api_json()
 
