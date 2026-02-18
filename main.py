@@ -23,7 +23,7 @@ TRUETYPE_PATH = 'Roboto-Light.ttf'
 FALLBACK_FONT_PATH = 'NotoSansCJK-Regular.ttc'
 BACKGROUND_DIR = "tmdb_backgrounds"
 # Update this to your GitHub Pages URL later
-BASE_URL_FOR_API = "https://your-username.github.io/your-repo-name"
+BASE_URL_FOR_API = "https://github.com/makeran218/projectivity-background-source"
 
 SERVICES = {
     "netflix": {"id": 213, "type": "network", "logo": "netflix_logo.png"},
