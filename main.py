@@ -25,7 +25,7 @@ BACKGROUND_DIR = "tmdb_backgrounds"
 # Update this to your GitHub Pages URL later
 # --- Configuration ---
 # This points directly to the raw file storage on GitHub
-BASE_URL_FOR_API = "https://raw.githubusercontent.com/makeran218/projectivity-background-source/main"
+BASE_URL_FOR_API = "https://makeran218.github.io/projectivity-background-source"
 
 SERVICES = {
     "netflix": {"id": 213, "type": "network", "logo": "netflix_logo.png"},
