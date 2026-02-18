@@ -2,10 +2,16 @@ name: Generate Backgrounds
 on:
   push:
     branches:
-      - main # This makes it run every time you push code
+      - main
   schedule:
     - cron: "0 0 * * *"
   workflow_dispatch:
+
+# Permissions needed for both Pushing code and Deploying Pages
+permissions:
+  contents: write
+  pages: write
+  id-token: write
 
 jobs:
   run-generator:
@@ -44,7 +50,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: "." # Upload the entire repository root
+          path: "."
 
       - name: Deploy to GitHub Pages
         id: deployment
