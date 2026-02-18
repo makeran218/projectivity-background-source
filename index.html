@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Wallpaper API</title>
+</head>
+
+<body>
+    <script>
+        fetch('api.json').then(r => r.json()).then(data => {
+            const random = data[Math.floor(Math.random() * data.length)];
+            document.body.innerHTML = `<pre>${JSON.stringify(random, null, 4)}</pre>`;
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,22 @@
+name: Daily Wallpaper Update
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - setup-python@v4
+        with:
+          python-version: '3.10'
+      - run: pip install -r requirements.txt
+      - run: python python_script.py
+        env:
+          TMDB_BEARER_TOKEN: ${{ secrets.TMDB_BEARER_TOKEN }}
+      - run: |
+          git config --local user.name "Actions Bot"
+          git add .
+          git commit -m "Update API and Wallpapers" || echo "No changes"
+          git push
