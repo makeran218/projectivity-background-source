@@ -169,16 +169,37 @@ class MediaGenerator:
     def run(self, service_key, is_movie, custom_label, limit=5, is_new_release=False):
         svc = SERVICES[service_key]
         m_type = "movie" if is_movie else "tv"
+
+        # 1. Base URL and standard params
         if svc["type"] == "network":
             param = "with_companies" if is_movie else "with_networks"
-            url = f"{TMDB_BASE_URL}/discover/{m_type}?{param}={svc['id']}&sort_by=popularity.desc"
+            url = f"{TMDB_BASE_URL}/discover/{m_type}?{param}={svc['id']}"
+
+            # 2. Logic to handle "New Release" vs "Popular"
+            if is_new_release:
+                # Get date from 60 days ago
+                min_date = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')
+                max_date = datetime.now().strftime('%Y-%m-%d')
+
+                if is_movie:
+                    url += f"&primary_release_date.gte={min_date}&primary_release_date.lte={max_date}&sort_by=primary_release_date.desc"
+                else:
+                    url += f"&first_air_date.gte={min_date}&first_air_date.lte={max_date}&sort_by=first_air_date.desc"
+            else:
+                url += "&sort_by=popularity.desc"
         else:
             url = f"{TMDB_BASE_URL}/trending/{m_type}/week"
 
-        results = requests.get(url, headers=HEADERS).json().get('results', [])
+        # Fetch and process
+        response = requests.get(url, headers=HEADERS).json()
+        results = response.get('results', [])
+
         for item in results[:limit]:
-            try: self.generate_image(item, is_movie, service_key, custom_label)
-            except Exception as e: print(f"Error: {e}")
+            try:
+                self.generate_image(item, is_movie, service_key, custom_label)
+            except Exception as e:
+                print(f"Error processing {item.get('title', 'Unknown')}: {e}")
+
         self.generate_api_json()
 
 if __name__ == "__main__":
