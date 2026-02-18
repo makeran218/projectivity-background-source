@@ -1,5 +1,8 @@
 name: Generate Backgrounds
 on:
+  push:
+    branches:
+      - main # This makes it run every time you push code
   schedule:
     - cron: "0 0 * * *"
   workflow_dispatch:
