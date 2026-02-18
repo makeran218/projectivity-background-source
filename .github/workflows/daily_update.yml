@@ -28,7 +28,7 @@ jobs:
       - name: Run Script
         env:
           TMDB_BEARER_TOKEN: ${{ secrets.TMDB_BEARER_TOKEN }}
-        run: python python_script.py
+        run: python main.py
 
       - name: Commit and Push
         run: |
