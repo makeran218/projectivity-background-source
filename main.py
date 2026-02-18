@@ -71,17 +71,20 @@ class MediaGenerator:
         url = f'{TMDB_BASE_URL}/{media_type}/{media_id}?language={LANGUAGE}'
         return requests.get(url, headers=HEADERS).json()
 
+
     def get_media_logo(self, media_type, media_id):
-        url = f"{TMDB_BASE_URL}/{media_type}/{media_id}/images"
+        # We add include_image_language to the request to be specific
+        url = f"{TMDB_BASE_URL}/{media_type}/{media_id}/images?include_image_language=en,null"
+
         try:
             response = requests.get(url, headers=HEADERS).json()
             all_logos = response.get("logos", [])
 
-            # 1. Filter by Language (Priority: en -> None -> Others)
-            # We look for 'en' specifically for US-style logos
+            # 1. Strict Language Filtering
+            # We prioritize "en" (English).
+            # We only accept 'null' if absolutely no 'en' logo exists.
             targeted_logos = [l for l in all_logos if l.get("iso_639_1") == "en"]
 
-            # If no English logos, fallback to 'null' (often textless or global logos)
             if not targeted_logos:
                 targeted_logos = [l for l in all_logos if l.get("iso_639_1") is None]
 
@@ -91,31 +94,36 @@ class MediaGenerator:
             if not top_3:
                 return None
 
+            # 3. Analyze the top 3 for the "Whitest" logo
+            best_logo_path = None
+            highest_brightness = 0
+
             for logo in top_3:
-                # Use w500 for faster download during the "White Check"
                 logo_url = f"https://image.tmdb.org/t/p/w500{logo['file_path']}"
                 l_res = requests.get(logo_url)
                 img = Image.open(BytesIO(l_res.content)).convert("RGBA")
 
-                # 3. Fast White Check using Masking
-                # This only looks at the pixels that aren't transparent
+                # Masking: Only check brightness of non-transparent pixels
                 alpha = img.split()[3]
-                rgb_img = img.convert("RGB")
-                stat = ImageStat.Stat(rgb_img, mask=alpha)
+                stat = ImageStat.Stat(img.convert("RGB"), mask=alpha)
 
-                # Calculate average brightness across R, G, B
-                # stat.mean returns a list: [avg_r, avg_g, avg_b]
+                # Calculate brightness (Mean of R, G, B)
                 avg_brightness = sum(stat.mean) / 3
 
-                # If the logo is bright (White/Silver), return it immediately
-                if avg_brightness > 200:
+                # If we find a very white logo (>220), take it immediately
+                if avg_brightness > 220:
                     return logo["file_path"]
 
-            # 4. Fallback: If no "White" logo found in Top 3, use the #1 English logo
-            return top_3[0]["file_path"]
+                # Otherwise, keep track of the brightest one we've seen
+                if avg_brightness > highest_brightness:
+                    highest_brightness = avg_brightness
+                    best_logo_path = logo["file_path"]
+
+            # Return the brightest one found (or the #1 popular one if all were dark)
+            return best_logo_path if best_logo_path else top_3[0]["file_path"]
 
         except Exception as e:
-            print(f"Error fetching logo for {media_id}: {e}")
+            print(f"Error fetching logo: {e}")
             return None
 
     def generate_image(self, item, is_movie, service_key, custom_label):
