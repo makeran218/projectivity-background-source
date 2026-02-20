@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPM
+import shutil
 
 load_dotenv(verbose=True)
 
@@ -48,8 +49,14 @@ TV_GENRES = get_genres("tv")
 
 class MediaGenerator:
     def __init__(self):
-        if not os.path.exists(BACKGROUND_DIR):
-            os.makedirs(BACKGROUND_DIR, exist_ok=True)
+        # 1. Delete the directory if it exists to start fresh
+        if os.path.exists(BACKGROUND_DIR):
+            print(f"Cleaning up old backgrounds in {BACKGROUND_DIR}...")
+            shutil.rmtree(BACKGROUND_DIR)
+
+        # 2. Recreate the empty directory
+        os.makedirs(BACKGROUND_DIR, exist_ok=True)
+
         self.download_fonts()
 
     def download_fonts(self):
