@@ -1,8 +1,7 @@
 import requests
-from PIL import Image, ImageDraw, ImageFont, ImageStat
+from PIL import Image, ImageDraw, ImageFont, ImageStat, ImageFilter
 from io import BytesIO
 import os
-import shutil
 import textwrap
 import re
 import json
@@ -16,16 +15,16 @@ load_dotenv(verbose=True)
 # --- Configuration ---
 TMDB_BEARER_TOKEN = os.getenv('TMDB_BEARER_TOKEN')
 TMDB_BASE_URL = os.getenv('TMDB_BASE_URL', 'https://api.themoviedb.org/3')
-LANGUAGE = os.getenv("TMDB_LANGUAGE", "en-US")
 HEADERS = {"accept": "application/json", "Authorization": f"Bearer {TMDB_BEARER_TOKEN}"}
 
 TRUETYPE_PATH = 'Roboto-Light.ttf'
 FALLBACK_FONT_PATH = 'NotoSansCJK-Regular.ttc'
 BACKGROUND_DIR = "tmdb_backgrounds"
-# Update this to your GitHub Pages URL later
-# --- Configuration ---
-# This points directly to the raw file storage on GitHub
 BASE_URL_FOR_API = "https://makeran218.github.io/projectivity-background-source"
+
+# 4K Canvas
+CANVAS_W = 3840
+CANVAS_H = 2160
 
 SERVICES = {
     "netflix": {"id": 213, "type": "network", "logo": "netflix_logo.png"},
@@ -38,7 +37,7 @@ SERVICES = {
 }
 
 def get_genres(media_type):
-    url = f'{TMDB_BASE_URL}/genre/{media_type}/list?language={LANGUAGE}'
+    url = f'{TMDB_BASE_URL}/genre/{media_type}/list?language=en-US'
     try:
         data = requests.get(url, headers=HEADERS).json()
         return {g['id']: g['name'] for g in data.get('genres', [])}
@@ -59,64 +58,25 @@ class MediaGenerator:
             r = requests.get(url)
             with open(TRUETYPE_PATH, 'wb') as f: f.write(r.content)
 
-    def contains_cjk(self, text):
-        return bool(re.search(r'[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]', text))
-
     def get_font(self, size, text=""):
-        if self.contains_cjk(text) and os.path.exists(FALLBACK_FONT_PATH):
+        if any(ord(c) > 0x4e00 for c in text) and os.path.exists(FALLBACK_FONT_PATH):
             return ImageFont.truetype(FALLBACK_FONT_PATH, size)
         return ImageFont.truetype(TRUETYPE_PATH, size)
 
     def get_details(self, media_type, media_id):
-        url = f'{TMDB_BASE_URL}/{media_type}/{media_id}?language={LANGUAGE}'
+        url = f'{TMDB_BASE_URL}/{media_type}/{media_id}?language=en-US'
         return requests.get(url, headers=HEADERS).json()
-
 
     def get_media_logo(self, media_type, media_id):
         url = f"{TMDB_BASE_URL}/{media_type}/{media_id}/images?include_image_language=en,null"
         try:
             response = requests.get(url, headers=HEADERS).json()
             all_logos = response.get("logos", [])
-
-            # Priority: English -> Universal
-            targeted = [l for l in all_logos if l.get("iso_639_1") == "en"]
-            if not targeted:
-                targeted = [l for l in all_logos if l.get("iso_639_1") is None]
-
-            top_3 = sorted(targeted, key=lambda x: x.get("vote_average", 0), reverse=True)[:3]
-            if not top_3: return None
-
-            best_path = None
-            highest_bright = 0
-
-            for logo in top_3:
-                path = logo['file_path']
-                l_res = requests.get(f"https://image.tmdb.org/t/p/original{path}")
-
-                if path.lower().endswith('.svg'):
-                    drawing = svg2rlg(BytesIO(l_res.content))
-                    mem = BytesIO()
-                    # bg=None is the critical fix here
-                    renderPM.drawToFile(drawing, mem, fmt="PNG", bg=None)
-                    img = Image.open(mem).convert("RGBA")
-                else:
-                    img = Image.open(BytesIO(l_res.content)).convert("RGBA")
-
-                # Brightness check using the actual transparency mask
-                alpha = img.split()[3]
-                stat = ImageStat.Stat(img.convert("RGB"), mask=alpha)
-
-                # Mean brightness of visible pixels
-                avg_b = sum(stat.mean) / 3 if stat.mean else 0
-
-                if avg_b > 220: return path # Found white, stop here
-                if avg_b > highest_bright:
-                    highest_bright = avg_b
-                    best_path = path
-
-            return best_path if best_path else top_3[0]["file_path"]
-        except:
-            return None
+            targeted = [l for l in all_logos if l.get("iso_639_1") == "en"] or [l for l in all_logos if l.get("iso_639_1") is None]
+            if not targeted: return None
+            top = sorted(targeted, key=lambda x: x.get("vote_average", 0), reverse=True)[0]
+            return top['file_path']
+        except: return None
 
     def generate_image(self, item, is_movie, service_key, custom_label):
         m_type, m_id = ("movie" if is_movie else "tv"), item['id']
@@ -129,70 +89,87 @@ class MediaGenerator:
 
         genres_source = MOVIE_GENRES if is_movie else TV_GENRES
         genre_str = ", ".join([genres_source.get(gid, '') for gid in item.get('genre_ids', [])][:2])
-        extra = f"{details.get('runtime', 0)//60}h{details.get('runtime', 0)%60}min" if is_movie else f"{details.get('number_of_seasons', 1)} Seasons"
+        extra = f"{details.get('runtime', 0)//60}h {details.get('runtime', 0)%60}m" if is_movie else f"{details.get('number_of_seasons', 1)} Seasons"
         info_text = f"{genre_str}  \u2022  {year}  \u2022  {extra}  \u2022  TMDB: {round(item.get('vote_average', 0), 1)}"
 
+        # 1. Background Setup
         backdrop_path = item.get('backdrop_path')
         if not backdrop_path: return
-
-        # Process Images
         bg_res = requests.get(f"https://image.tmdb.org/t/p/original{backdrop_path}")
-        image = Image.open(BytesIO(bg_res.content))
-        image = image.resize((int(image.width * (1500/image.height)), 1500))
+        image = Image.open(BytesIO(bg_res.content)).convert("RGBA")
 
-        bckg = Image.open("bckg.png").convert("RGBA")
-        overlay = Image.open("overlay.png").convert("RGBA")
-        brand_logo = Image.open(svc["logo"]).convert("RGBA")
+        # Aspect Fill Crop to 4K
+        target_ratio = CANVAS_W / CANVAS_H
+        img_ratio = image.width / image.height
+        if img_ratio > target_ratio:
+            new_w = int(target_ratio * image.height)
+            image = image.crop(((image.width - new_w)//2, 0, (image.width + new_w)//2, image.height))
+        else:
+            new_h = int(image.width / target_ratio)
+            image = image.crop((0, (image.height - new_h)//2, image.width, (image.height + new_h)//2))
+        image = image.resize((CANVAS_W, CANVAS_H), Image.LANCZOS)
 
-        bckg.paste(image, (1175, 0))
-        bckg.alpha_composite(overlay, (1175, 0))
-        draw = ImageDraw.Draw(bckg)
+        # 2. Overlay custom vignette.png
+        if os.path.exists("vignette.png"):
+            vig = Image.open("vignette.png").convert("RGBA")
+            if vig.size != (CANVAS_W, CANVAS_H):
+                vig = vig.resize((CANVAS_W, CANVAS_H), Image.LANCZOS)
+            image.alpha_composite(vig)
 
-        # Overview & Info
-        f_small = self.get_font(50, item.get('overview', ''))
-        wrapped_ov = "\n".join(textwrap.wrap(item.get('overview', ''), width=70, max_lines=2, placeholder=" ..."))
-        draw.text((210, 730), wrapped_ov, font=f_small, fill="white")
-        draw.text((210, 650), info_text, font=f_small, fill=(150, 150, 150))
+        draw = ImageDraw.Draw(image)
 
-        # Brand Logo Positioning
-        f_custom = self.get_font(30, custom_label)
-        label_pos = (210, 890)
-        draw.text(label_pos, f"{custom_label}".upper(), font=f_custom, fill="white")
-        bbox = draw.textbbox(label_pos, f"{custom_label}".upper(), font=f_custom)
+        # 3. BRANDING AT THE VERY TOP
+        if os.path.exists(svc["logo"]):
+            brand_logo = Image.open(svc["logo"]).convert("RGBA")
+            log_h = 100 # Slightly smaller for top corner/header feel
+            brand_logo = brand_logo.resize((int(brand_logo.width * (log_h/brand_logo.height)), log_h))
 
-        log_h = 80
-        brand_logo = brand_logo.resize((int(brand_logo.width * (log_h/brand_logo.height)), log_h))
-        bckg.alpha_composite(brand_logo, (label_pos[0], bbox[3] + 20))
+            f_custom = self.get_font(40, custom_label)
+            label_text = f"{custom_label}".upper()
+            lab_bbox = draw.textbbox((0, 0), label_text, font=f_custom)
 
-        # Media Logo Logic
+            # Position Label and Logo at the top (centered)
+            draw.text(((CANVAS_W - (lab_bbox[2]-lab_bbox[0]))//2, 100), label_text, font=f_custom, fill="white")
+            image.alpha_composite(brand_logo, ((CANVAS_W - brand_logo.width)//2, 160))
+
+        # 4. MAIN CONTENT (Moved up)
+        current_y = 480
+
+        # Logo / Fallback Title
         logo_path = self.get_media_logo(m_type, m_id)
-        logo_img = None
         if logo_path:
             l_res = requests.get(f"https://image.tmdb.org/t/p/original{logo_path}")
-            if logo_path.lower().endswith('.svg'):
-                drawing = svg2rlg(BytesIO(l_res.content))
-                mem = BytesIO()
-                renderPM.drawToFile(drawing, mem, fmt="PNG")
-                logo_img = Image.open(mem).convert("RGBA")
-            else:
-                logo_img = Image.open(BytesIO(l_res.content)).convert("RGBA")
-
-        if logo_img:
-            ratio = min(1000/logo_img.width, 450/logo_img.height)
+            logo_img = Image.open(BytesIO(l_res.content)).convert("RGBA")
+            ratio = min(1600/logo_img.width, 550/logo_img.height)
             logo_img = logo_img.resize((int(logo_img.width * ratio), int(logo_img.height * ratio)), Image.LANCZOS)
-            bckg.alpha_composite(logo_img, (200, 600 - logo_img.height))
+            image.alpha_composite(logo_img, ((CANVAS_W - logo_img.width)//2, current_y))
+            current_y += logo_img.height + 50
         else:
-            f_title = self.get_font(190, title)
-            draw.text((200, 420), title, font=f_title, fill="white")
+            f_title = self.get_font(300, title)
+            t_bbox = draw.textbbox((0, 0), title, font=f_title)
+            draw.text(((CANVAS_W - (t_bbox[2]-t_bbox[0]))//2, current_y), title, font=f_title, fill="white")
+            current_y += 380
 
-        # --- OPTIMIZATION STEP ---
-        # Convert to RGB, save as JPEG with quality 85 and optimization turned on
+        # Info Text
+        f_info = self.get_font(70)
+        i_bbox = draw.textbbox((0, 0), info_text, font=f_info)
+        draw.text(((CANVAS_W - (i_bbox[2]-i_bbox[0]))//2, current_y), info_text, font=f_info, fill=(210, 210, 210))
+        current_y += 100
+
+        # Description (Smaller font size)
+        f_ov = self.get_font(55, item.get('overview', '')) # Reduced from 65
+        wrapped_ov = textwrap.wrap(item.get('overview', ''), width=110) # Wider width for smaller font
+        for line in wrapped_ov[:3]:
+            l_bbox = draw.textbbox((0, 0), line, font=f_ov)
+            draw.text(((CANVAS_W - (l_bbox[2]-l_bbox[0]))//2, current_y), line, font=f_ov, fill="white")
+            current_y += 75
+
+        # 5. Save Result
         output_path = os.path.join(BACKGROUND_DIR, f"{m_type}_tmdb_{m_id}.jpg")
-        bckg.convert("RGB").save(output_path, "JPEG", quality=85, optimize=True)
+        image.convert("RGB").save(output_path, "JPEG", quality=92, optimize=True)
 
     def generate_api_json(self):
         api_data = []
-        # Sort files so the JSON isn't jumbled
         filenames = sorted(os.listdir(BACKGROUND_DIR))
         for filename in filenames:
             if filename.endswith(".jpg"):
@@ -209,55 +186,41 @@ class MediaGenerator:
     def run(self, service_key, is_movie, custom_label, limit=5, is_new_release=False):
         svc = SERVICES[service_key]
         m_type = "movie" if is_movie else "tv"
-
-        # 1. Dynamic URL Generation
         if svc["type"] == "network":
             param = "with_companies" if is_movie else "with_networks"
             url = f"{TMDB_BASE_URL}/discover/{m_type}?{param}={svc['id']}"
-
             if is_new_release:
-                # 60 day window for New Releases
                 date_min = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')
-                date_key = "primary_release_date" if is_movie else "first_air_date"
-                url += f"&{date_key}.gte={date_min}&sort_by={date_key}.desc"
+                url += f"&{'primary_release_date' if is_movie else 'first_air_date'}.gte={date_min}&sort_by=popularity.desc"
             else:
                 url += "&sort_by=popularity.desc"
         else:
             url = f"{TMDB_BASE_URL}/trending/{m_type}/week"
 
-        # 2. Limit processing
         results = requests.get(url, headers=HEADERS).json().get('results', [])
         for item in results[:limit]:
             try:
                 self.generate_image(item, is_movie, service_key, custom_label)
             except Exception as e:
                 print(f"Skipping {item.get('id')}: {e}")
-
         self.generate_api_json()
+
 
 if __name__ == "__main__":
     bot = MediaGenerator()
 
-    # Netflix
-    bot.run(service_key="netflix", is_movie=True, custom_label="New Release on ", limit=5, is_new_release=True)
-    bot.run(service_key="netflix", is_movie=False, custom_label="New Release on ", limit=5, is_new_release=True)
-    bot.run(service_key="netflix", is_movie=True, custom_label="Popular on ", limit=5, is_new_release=False)
-    bot.run(service_key="netflix", is_movie=False, custom_label="Popular on ", limit=5, is_new_release=False)
+    # Execution Lists
+    targets = [
+        ("netflix", "New Release on ", True),
+        ("netflix", "Popular on ", False),
+        ("paramount", "New Release on ", True),
+        ("paramount", "Popular on ", False),
+        ("amazon", "New Release on ", True),
+        ("amazon", "Popular on ", False),
+        ("peacock", "New Release on ", True),
+        ("peacock", "Popular on ", False),
+    ]
 
-    # Paramount
-    bot.run(service_key="paramount", is_movie=True, custom_label="New Release on ", limit=5, is_new_release=True)
-    bot.run(service_key="paramount", is_movie=False, custom_label="New Release on ", limit=5, is_new_release=True)
-    bot.run(service_key="paramount", is_movie=True, custom_label="Popular on ", limit=5, is_new_release=False)
-    bot.run(service_key="paramount", is_movie=False, custom_label="Popular on ", limit=5, is_new_release=False)
-
-    # Amazon
-    bot.run(service_key="amazon", is_movie=True, custom_label="New Release on ", limit=5, is_new_release=True)
-    bot.run(service_key="amazon", is_movie=False, custom_label="New Release on ", limit=5, is_new_release=True)
-    bot.run(service_key="amazon", is_movie=True, custom_label="Popular on ", limit=5, is_new_release=False)
-    bot.run(service_key="amazon", is_movie=False, custom_label="Popular on ", limit=5, is_new_release=False)
-
-    #peacock
-    bot.run(service_key="peacock", is_movie=True, custom_label="New Release on ", limit=5, is_new_release=True)
-    bot.run(service_key="peacock", is_movie=False, custom_label="New Release on ", limit=5, is_new_release=True)
-    bot.run(service_key="peacock", is_movie=True, custom_label="Popular on ", limit=5, is_new_release=False)
-    bot.run(service_key="peacock", is_movie=False, custom_label="Popular on ", limit=5, is_new_release=False)
+    for svc, label, new_rel in targets:
+        bot.run(service_key=svc, is_movie=True, custom_label=label, limit=5, is_new_release=new_rel)
+        bot.run(service_key=svc, is_movie=False, custom_label=label, limit=5, is_new_release=new_rel)
