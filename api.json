@@ -1,10 +1,5 @@
 [
     {
-        "actionUrl": "movie_tmdb:1061990",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/movie_tmdb_1061990.jpg",
-        "title": "movie_tmdb_1061990"
-    },
-    {
         "actionUrl": "movie_tmdb:1287141",
         "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/movie_tmdb_1287141.jpg",
         "title": "movie_tmdb_1287141"
@@ -80,11 +75,6 @@
         "title": "tv_tmdb_107365"
     },
     {
-        "actionUrl": "tv_tmdb:108978",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_108978.jpg",
-        "title": "tv_tmdb_108978"
-    },
-    {
         "actionUrl": "tv_tmdb:120998",
         "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_120998.jpg",
         "title": "tv_tmdb_120998"
@@ -93,16 +83,6 @@
         "actionUrl": "tv_tmdb:153312",
         "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_153312.jpg",
         "title": "tv_tmdb_153312"
-    },
-    {
-        "actionUrl": "tv_tmdb:157741",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_157741.jpg",
-        "title": "tv_tmdb_157741"
-    },
-    {
-        "actionUrl": "tv_tmdb:201834",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_201834.jpg",
-        "title": "tv_tmdb_201834"
     },
     {
         "actionUrl": "tv_tmdb:206494",
@@ -140,11 +120,6 @@
         "title": "tv_tmdb_246412"
     },
     {
-        "actionUrl": "tv_tmdb:249760",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_249760.jpg",
-        "title": "tv_tmdb_249760"
-    },
-    {
         "actionUrl": "tv_tmdb:250220",
         "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_250220.jpg",
         "title": "tv_tmdb_250220"
@@ -155,34 +130,14 @@
         "title": "tv_tmdb_254071"
     },
     {
-        "actionUrl": "tv_tmdb:254420",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_254420.jpg",
-        "title": "tv_tmdb_254420"
-    },
-    {
         "actionUrl": "tv_tmdb:255661",
         "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_255661.jpg",
         "title": "tv_tmdb_255661"
     },
     {
-        "actionUrl": "tv_tmdb:257519",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_257519.jpg",
-        "title": "tv_tmdb_257519"
-    },
-    {
         "actionUrl": "tv_tmdb:258462",
         "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_258462.jpg",
         "title": "tv_tmdb_258462"
-    },
-    {
-        "actionUrl": "tv_tmdb:259702",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_259702.jpg",
-        "title": "tv_tmdb_259702"
-    },
-    {
-        "actionUrl": "tv_tmdb:262273",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_262273.jpg",
-        "title": "tv_tmdb_262273"
     },
     {
         "actionUrl": "tv_tmdb:262793",
@@ -210,11 +165,6 @@
         "title": "tv_tmdb_280948"
     },
     {
-        "actionUrl": "tv_tmdb:292686",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_292686.jpg",
-        "title": "tv_tmdb_292686"
-    },
-    {
         "actionUrl": "tv_tmdb:308767",
         "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_308767.jpg",
         "title": "tv_tmdb_308767"
@@ -225,49 +175,9 @@
         "title": "tv_tmdb_310239"
     },
     {
-        "actionUrl": "tv_tmdb:311654",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_311654.jpg",
-        "title": "tv_tmdb_311654"
-    },
-    {
-        "actionUrl": "tv_tmdb:312421",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_312421.jpg",
-        "title": "tv_tmdb_312421"
-    },
-    {
-        "actionUrl": "tv_tmdb:312423",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_312423.jpg",
-        "title": "tv_tmdb_312423"
-    },
-    {
-        "actionUrl": "tv_tmdb:312493",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_312493.jpg",
-        "title": "tv_tmdb_312493"
-    },
-    {
-        "actionUrl": "tv_tmdb:312593",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_312593.jpg",
-        "title": "tv_tmdb_312593"
-    },
-    {
-        "actionUrl": "tv_tmdb:312694",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_312694.jpg",
-        "title": "tv_tmdb_312694"
-    },
-    {
         "actionUrl": "tv_tmdb:312722",
         "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_312722.jpg",
         "title": "tv_tmdb_312722"
-    },
-    {
-        "actionUrl": "tv_tmdb:313995",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_313995.jpg",
-        "title": "tv_tmdb_313995"
-    },
-    {
-        "actionUrl": "tv_tmdb:314127",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_314127.jpg",
-        "title": "tv_tmdb_314127"
     },
     {
         "actionUrl": "tv_tmdb:4057",
@@ -285,11 +195,6 @@
         "title": "tv_tmdb_4656"
     },
     {
-        "actionUrl": "tv_tmdb:63639",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_63639.jpg",
-        "title": "tv_tmdb_63639"
-    },
-    {
         "actionUrl": "tv_tmdb:656",
         "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_656.jpg",
         "title": "tv_tmdb_656"
@@ -303,11 +208,6 @@
         "actionUrl": "tv_tmdb:67198",
         "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_67198.jpg",
         "title": "tv_tmdb_67198"
-    },
-    {
-        "actionUrl": "tv_tmdb:67384",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_67384.jpg",
-        "title": "tv_tmdb_67384"
     },
     {
         "actionUrl": "tv_tmdb:71789",
@@ -328,10 +228,5 @@
         "actionUrl": "tv_tmdb:86848",
         "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_86848.jpg",
         "title": "tv_tmdb_86848"
-    },
-    {
-        "actionUrl": "tv_tmdb:91239",
-        "imageUrl": "https://makeran218.github.io/projectivity-background-source/tmdb_backgrounds/tv_tmdb_91239.jpg",
-        "title": "tv_tmdb_91239"
     }
 ]
