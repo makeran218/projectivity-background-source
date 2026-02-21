@@ -7,9 +7,8 @@ on:
     - cron: "0 0 * * *"
   workflow_dispatch:
 
-# Permissions needed for both Pushing code and Deploying Pages
 permissions:
-  contents: write
+  contents: read # We only need to read the code
   pages: write
   id-token: write
 
@@ -36,13 +35,8 @@ jobs:
           TMDB_BEARER_TOKEN: ${{ secrets.TMDB_BEARER_TOKEN }}
         run: python main.py
 
-      - name: Commit and Push
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add .
-          git commit -m "Auto-update wallpapers and api.json" || echo "No changes to commit"
-          git push
+      # IMPORTANT: We removed "Commit and Push" here.
+      # The images now only exist in the temporary "runner" memory.
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -50,6 +44,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
+          # This uploads the current folder (including generated images)
+          # directly to the GitHub Pages web server.
           path: "."
 
       - name: Deploy to GitHub Pages
