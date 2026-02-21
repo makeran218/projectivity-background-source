@@ -144,21 +144,49 @@ class MediaGenerator:
 
         # 4. MAIN CONTENT (Moved up)
         current_y = 480
+        MAX_TEXT_W = int(CANVAS_W * 0.8)  # 80% of screen width
 
         # Logo / Fallback Title
         logo_path = self.get_media_logo(m_type, m_id)
         if logo_path:
-            l_res = requests.get(f"https://image.tmdb.org/t/p/original{logo_path}")
-            logo_img = Image.open(BytesIO(l_res.content)).convert("RGBA")
-            ratio = min(1600/logo_img.width, 550/logo_img.height)
-            logo_img = logo_img.resize((int(logo_img.width * ratio), int(logo_img.height * ratio)), Image.LANCZOS)
-            image.alpha_composite(logo_img, ((CANVAS_W - logo_img.width)//2, current_y))
-            current_y += logo_img.height + 50
-        else:
-            f_title = self.get_font(300, title)
-            t_bbox = draw.textbbox((0, 0), title, font=f_title)
-            draw.text(((CANVAS_W - (t_bbox[2]-t_bbox[0]))//2, current_y), title, font=f_title, fill="white")
-            current_y += 380
+            try:
+                l_res = requests.get(f"https://image.tmdb.org/t/p/original{logo_path}")
+                logo_img = Image.open(BytesIO(l_res.content)).convert("RGBA")
+                # Scale logo to fit 80% width max
+                ratio = min(MAX_TEXT_W/logo_img.width, 550/logo_img.height)
+                logo_img = logo_img.resize((int(logo_img.width * ratio), int(logo_img.height * ratio)), Image.LANCZOS)
+                image.alpha_composite(logo_img, ((CANVAS_W - logo_img.width)//2, current_y))
+                current_y += logo_img.height + 50
+            except:
+                logo_path = None # Trigger fallback if logo download fails
+
+        if not logo_path:
+            target_font_size = 300
+            f_title = self.get_font(target_font_size, title)
+
+            # Wrap text first to handle long titles (like some Anime titles)
+            # 25-30 chars is usually safe for a 300pt font at 80% width
+            wrapped_title = textwrap.wrap(title, width=25)
+
+            # Dynamically shrink font size if any line is still too wide
+            for line in wrapped_title:
+                while True:
+                    t_bbox = draw.textbbox((0, 0), line, font=f_title)
+                    line_w = t_bbox[2] - t_bbox[0]
+                    if line_w <= MAX_TEXT_W or target_font_size <= 100:
+                        break
+                    target_font_size -= 20
+                    f_title = self.get_font(target_font_size, title)
+
+            # Draw the lines
+            for line in wrapped_title:
+                t_bbox = draw.textbbox((0, 0), line, font=f_title)
+                line_w = t_bbox[2] - t_bbox[0]
+                line_h = t_bbox[3] - t_bbox[1]
+                draw.text(((CANVAS_W - line_w)//2, current_y), line, font=f_title, fill="white")
+                current_y += line_h + 20 # Add small spacing between lines
+
+            current_y += 40 # Extra margin before info text
 
         # Info Text
         f_info = self.get_font(70)
@@ -197,54 +225,47 @@ class MediaGenerator:
         svc = SERVICES.get(service_key, SERVICES["trending"])
         m_type = "movie" if is_movie else "tv"
 
-        # 1. Start with the base Discover URL
-        # Discover is more powerful than Trending for specific filtering
+        # Base Discover URL
         url = f"{TMDB_BASE_URL}/discover/{m_type}?include_adult=false&language=en-US&sort_by=popularity.desc"
 
-        # 2. Logic for Anime (Popular and New Releases)
-        if "anime" in service_key.lower():
-            # Genre 16 is Animation, ja is Japanese
+        # --- Crunchyroll & General Anime Logic ---
+        if service_key == "crunchyroll" or "anime" in service_key.lower():
+            # Force Japanese Animation
             url += "&with_genres=16&with_original_language=ja"
 
+            # If it's specifically Crunchyroll, filter by their Network ID (mostly for TV)
+            if service_key == "crunchyroll" and not is_movie:
+                url += f"&with_networks={svc['id']}"
+
             if is_new_release:
-                # Seasonal anime usually releases within the last 90 days
                 date_min = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
                 date_param = "primary_release_date.gte" if is_movie else "first_air_date.gte"
                 url += f"&{date_param}={date_min}"
 
-        # 3. Logic for Streaming Networks (Netflix, Amazon, etc.)
+        # --- Standard Streaming Networks ---
         elif svc["type"] == "network":
             param = "with_companies" if is_movie else "with_networks"
             url += f"&{param}={svc['id']}"
-
             if is_new_release:
                 date_min = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')
                 date_param = "primary_release_date.gte" if is_movie else "first_air_date.gte"
                 url += f"&{date_param}={date_min}"
 
-        # 4. Fallback for Trending (If not Anime or Network)
+        # --- Trending Fallback ---
         elif svc["type"] == "trending":
             url = f"{TMDB_BASE_URL}/trending/{m_type}/week"
 
-        # Fetch and Process
+        # Request Execution
         try:
-            response = requests.get(url, headers=HEADERS)
-            response.raise_for_status()
-            results = response.json().get('results', [])
-
-            print(f"--- Processing {custom_label} ({m_type}) ---")
+            results = requests.get(url, headers=HEADERS).json().get('results', [])
             for item in results[:limit]:
                 try:
-                    # Add a small delay if you hit rate limits
                     self.generate_image(item, is_movie, service_key, custom_label)
-                    print(f"Generated: {item.get('title') if is_movie else item.get('name')}")
                 except Exception as e:
-                    print(f"Skipping ID {item.get('id')}: {e}")
-
+                    print(f"Skipping {item.get('id')}: {e}")
             self.generate_api_json()
-
         except Exception as e:
-            print(f"API Request failed for {service_key}: {e}")
+            print(f"Failed to fetch data for {service_key}: {e}")
 
 
 if __name__ == "__main__":
@@ -267,3 +288,14 @@ if __name__ == "__main__":
     for svc, label, new_rel in targets:
         bot.run(service_key=svc, is_movie=True, custom_label=label, limit=5, is_new_release=new_rel)
         bot.run(service_key=svc, is_movie=False, custom_label=label, limit=5, is_new_release=new_rel)
+
+    # Define specialized Crunchyroll targets
+    anime_targets = [
+        ("crunchyroll", "New on Crunchyroll", True),
+        ("crunchyroll", "Popular on Crunchyroll", False),
+    ]
+
+    for svc, label, new_rel in anime_targets:
+        # Crunchyroll is 95% TV Series
+        bot.run(svc, is_movie=False, custom_label=label, limit=8, is_new_release=new_rel)
+        bot.run(svc, is_movie=True, custom_label=label, limit=5, is_new_release=new_rel)
