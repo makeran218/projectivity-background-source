@@ -33,6 +33,7 @@ jobs:
       - name: Run Script
         env:
           TMDB_BEARER_TOKEN: ${{ secrets.TMDB_BEARER_TOKEN }}
+          TRAKT_API_KEY: ${{ secrets.TRAKT_API_KEY }}
         run: python main.py
 
       # IMPORTANT: We removed "Commit and Push" here.
