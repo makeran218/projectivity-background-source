@@ -14,6 +14,12 @@ load_dotenv(verbose=True)
 # --- Configuration ---
 TMDB_BEARER_TOKEN = os.getenv('TMDB_BEARER_TOKEN')
 TMDB_BASE_URL = os.getenv('TMDB_BASE_URL', 'https://api.themoviedb.org/3')
+TRAKT_API_KEY = os.getenv('TRAKT_API_KEY')
+
+# Trakt User Variables
+TRAKT_USERNAME = "giladg"
+TRAKT_LISTNAME = "latest-releases"
+
 HEADERS = {"accept": "application/json", "Authorization": f"Bearer {TMDB_BEARER_TOKEN}"}
 
 # Font Paths
@@ -38,7 +44,8 @@ SERVICES = {
     "trending": {"id": None, "type": "trending", "logo": "tmdblogo.png"},
     "crunchyroll": {"id": 1112, "type": "network", "logo": "crunchyroll.png"},
     "anime_popular": {"id": None, "type": "anime", "logo": "tmdblogo.png"},
-    "anime_new": {"id": None, "type": "anime", "logo": "tmdblogo.png"}
+    "anime_new": {"id": None, "type": "anime", "logo": "tmdblogo.png"},
+    "trakt": {"id": None, "type": "trakt", "logo": "traktlogo.png"}
 }
 
 def get_genres(media_type):
@@ -60,14 +67,12 @@ class MediaGenerator:
         self.download_fonts()
 
     def download_fonts(self):
-        # Download Bebas Neue for Titles
         if not os.path.exists(TITLE_FONT_PATH):
             print("Downloading Bebas Neue...")
             url = 'https://github.com/google/fonts/raw/main/ofl/bebasneue/BebasNeue-Regular.ttf'
             r = requests.get(url)
             with open(TITLE_FONT_PATH, 'wb') as f: f.write(r.content)
 
-        # Download Roboto for Body Text
         if not os.path.exists(BODY_FONT_PATH):
             print("Downloading Roboto Light...")
             url = 'https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Light.ttf'
@@ -75,13 +80,9 @@ class MediaGenerator:
             with open(BODY_FONT_PATH, 'wb') as f: f.write(r.content)
 
     def get_font(self, size, text="", is_title=False):
-        # 1. Handle CJK Fallback
         if any(ord(c) > 0x4e00 for c in text):
             if os.path.exists(FALLBACK_FONT_PATH):
                 return ImageFont.truetype(FALLBACK_FONT_PATH, size)
-            print("Warning: CJK font missing, falling back to default.")
-
-        # 2. Use Bebas for Titles, Roboto for others
         font_path = TITLE_FONT_PATH if is_title else BODY_FONT_PATH
         return ImageFont.truetype(font_path, size)
 
@@ -102,20 +103,19 @@ class MediaGenerator:
 
     def generate_image(self, item, is_movie, service_key, custom_label):
         m_type, m_id = ("movie" if is_movie else "tv"), item['id']
-        title = item.get('title') if is_movie else item.get('name')
+        details = self.get_details(m_type, m_id)
+
+        title = details.get('title') if is_movie else details.get('name')
         svc = SERVICES.get(service_key, SERVICES["trending"])
 
-        details = self.get_details(m_type, m_id)
-        date_raw = item.get('release_date') if is_movie else item.get('first_air_date')
+        date_raw = details.get('release_date') if is_movie else details.get('first_air_date')
         year = date_raw[:4] if date_raw else "N/A"
 
-        genres_source = MOVIE_GENRES if is_movie else TV_GENRES
-        genre_str = ", ".join([genres_source.get(gid, '') for gid in item.get('genre_ids', [])][:2])
+        genres = ", ".join([g['name'] for g in details.get('genres', [])][:2])
         extra = f"{details.get('runtime', 0)//60}h {details.get('runtime', 0)%60}m" if is_movie else f"{details.get('number_of_seasons', 1)} Seasons"
-        info_text = f"{genre_str}  \u2022  {year}  \u2022  {extra}  \u2022  TMDB: {round(item.get('vote_average', 0), 1)}"
+        info_text = f"{genres}  \u2022  {year}  \u2022  {extra}  \u2022  TMDB: {round(details.get('vote_average', 0), 1)}"
 
-        # 1. Background Setup
-        backdrop_path = item.get('backdrop_path')
+        backdrop_path = details.get('backdrop_path')
         if not backdrop_path: return
         bg_res = requests.get(f"https://image.tmdb.org/t/p/original{backdrop_path}")
         image = Image.open(BytesIO(bg_res.content)).convert("RGBA")
@@ -132,13 +132,10 @@ class MediaGenerator:
 
         if os.path.exists("vignette.png"):
             vig = Image.open("vignette.png").convert("RGBA")
-            if vig.size != (CANVAS_W, CANVAS_H):
-                vig = vig.resize((CANVAS_W, CANVAS_H), Image.LANCZOS)
-            image.alpha_composite(vig)
+            image.alpha_composite(vig.resize((CANVAS_W, CANVAS_H)))
 
         draw = ImageDraw.Draw(image)
 
-        # 2. Branding (Centered Top)
         if os.path.exists(svc["logo"]):
             brand_logo = Image.open(svc["logo"]).convert("RGBA")
             log_h = 100
@@ -149,10 +146,8 @@ class MediaGenerator:
             draw.text(((CANVAS_W - (lab_bbox[2]-lab_bbox[0]))//2, 100), label_text, font=f_custom, fill="white")
             image.alpha_composite(brand_logo, ((CANVAS_W - brand_logo.width)//2, 160))
 
-        # 3. Main Content
         current_y = 480
-        MAX_TEXT_W = int(CANVAS_W * 0.8)
-        MAX_TITLE_H = 500
+        MAX_TEXT_W, MAX_TITLE_H = int(CANVAS_W * 0.8), 500
 
         logo_path = self.get_media_logo(m_type, m_id)
         if logo_path:
@@ -169,26 +164,20 @@ class MediaGenerator:
             is_cjk = any(ord(c) > 0x4e00 for c in title)
             display_title = title.upper() if not is_cjk else title
             target_font_size = 350 if not is_cjk else 250
-
             while target_font_size > 80:
                 f_title = self.get_font(target_font_size, display_title, is_title=True)
                 wrap_val = (25 if target_font_size > 250 else 40) if not is_cjk else 15
                 wrapped_lines = textwrap.wrap(display_title, width=wrap_val)
-                total_h, max_line_w, line_data = 0, 0, []
-
+                total_h, line_data = 0, []
                 for line in wrapped_lines:
                     bbox = draw.textbbox((0, 0), line, font=f_title)
                     w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
                     total_h += h + 20
-                    max_line_w = max(max_line_w, w)
                     line_data.append((line, w, h))
-
-                if max_line_w <= MAX_TEXT_W and total_h <= MAX_TITLE_H:
+                if max([d[1] for d in line_data]) <= MAX_TEXT_W and total_h <= MAX_TITLE_H:
                     shadow_offset = 3
                     for line, w, h in line_data:
-                        # Shadow
                         draw.text(((CANVAS_W - w)//2 + shadow_offset, current_y + shadow_offset), line, font=f_title, fill=(0, 0, 0, 180))
-                        # Main Text
                         draw.text(((CANVAS_W - w)//2, current_y), line, font=f_title, fill="white")
                         current_y += h + 20
                     break
@@ -196,15 +185,15 @@ class MediaGenerator:
 
         current_y = max(current_y, 480 + MAX_TITLE_H + 20)
 
-        # 4. Info & Description (Roboto with Shadows)
         f_info = self.get_font(70, info_text, is_title=False)
         i_bbox = draw.textbbox((0, 0), info_text, font=f_info)
         draw.text(((CANVAS_W - (i_bbox[2]-i_bbox[0]))//2 + 1, current_y + 1), info_text, font=f_info, fill=(0,0,0,150))
         draw.text(((CANVAS_W - (i_bbox[2]-i_bbox[0]))//2, current_y), info_text, font=f_info, fill=(210, 210, 210))
         current_y += 110
 
-        f_ov = self.get_font(55, item.get('overview', ''), is_title=False)
-        wrapped_ov = textwrap.wrap(item.get('overview', ''), width=110)
+        overview = details.get('overview', '')
+        f_ov = self.get_font(55, overview, is_title=False)
+        wrapped_ov = textwrap.wrap(overview, width=110)
         for line in wrapped_ov[:3]:
             l_bbox = draw.textbbox((0, 0), line, font=f_ov)
             draw.text(((CANVAS_W - (l_bbox[2]-l_bbox[0]))//2 + 2, current_y + 2), line, font=f_ov, fill=(0,0,0,150))
@@ -228,6 +217,24 @@ class MediaGenerator:
                 })
         with open("api.json", "w") as f:
             json.dump(api_data, f, indent=4)
+
+    def run_trakt(self, username, list_name):
+        url = f"https://api.trakt.tv/users/{username}/lists/{list_name}/items"
+        t_headers = {"Content-Type": "application/json", "trakt-api-version": "2", "trakt-api-key": TRAKT_API_KEY}
+        try:
+            res = requests.get(url, headers=t_headers)
+            if res.status_code == 200:
+                items = res.json()
+                for item in items[:20]:
+                    m_type = item['type']
+                    tmdb_id = item[m_type]['ids']['tmdb']
+                    try:
+                        self.generate_image({'id': tmdb_id}, (m_type == 'movie'), "trakt", "Featured on")
+                        print(f"Generated Trakt {m_type}: {tmdb_id}")
+                    except Exception as e: print(f"Error processing Trakt item {tmdb_id}: {e}")
+            else: print(f"Trakt API Error: {res.status_code}")
+            self.generate_api_json()
+        except Exception as e: print(f"Trakt request failed: {e}")
 
     def run(self, service_key, is_movie, custom_label, limit=5, is_new_release=False):
         svc = SERVICES.get(service_key, SERVICES["trending"])
@@ -262,6 +269,8 @@ class MediaGenerator:
 
 if __name__ == "__main__":
     bot = MediaGenerator()
+
+    # 1. Standard Targets
     targets = [
         ("netflix", "New Release on", True),
         ("netflix", "Popular on", False),
@@ -282,3 +291,6 @@ if __name__ == "__main__":
     for svc, label, new_rel in [("crunchyroll", "New on", True), ("crunchyroll", "Popular on", False)]:
         bot.run(svc, False, label, 10, new_rel)
         bot.run(svc, True, label, 10, new_rel)
+
+    # 2. Trakt List Integration
+    bot.run_trakt(TRAKT_USERNAME, TRAKT_LISTNAME)
