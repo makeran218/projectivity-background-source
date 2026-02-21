@@ -184,7 +184,7 @@ class MediaGenerator:
                     line_data.append((line, w, h))
 
                 if max_line_w <= MAX_TEXT_W and total_h <= MAX_TITLE_H:
-                    shadow_offset = 6
+                    shadow_offset = 3
                     for line, w, h in line_data:
                         # Shadow
                         draw.text(((CANVAS_W - w)//2 + shadow_offset, current_y + shadow_offset), line, font=f_title, fill=(0, 0, 0, 180))
@@ -199,7 +199,7 @@ class MediaGenerator:
         # 4. Info & Description (Roboto with Shadows)
         f_info = self.get_font(70, info_text, is_title=False)
         i_bbox = draw.textbbox((0, 0), info_text, font=f_info)
-        draw.text(((CANVAS_W - (i_bbox[2]-i_bbox[0]))//2 + 3, current_y + 3), info_text, font=f_info, fill=(0,0,0,150))
+        draw.text(((CANVAS_W - (i_bbox[2]-i_bbox[0]))//2 + 1, current_y + 1), info_text, font=f_info, fill=(0,0,0,150))
         draw.text(((CANVAS_W - (i_bbox[2]-i_bbox[0]))//2, current_y), info_text, font=f_info, fill=(210, 210, 210))
         current_y += 110
 
