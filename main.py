@@ -142,51 +142,63 @@ class MediaGenerator:
             draw.text(((CANVAS_W - (lab_bbox[2]-lab_bbox[0]))//2, 100), label_text, font=f_custom, fill="white")
             image.alpha_composite(brand_logo, ((CANVAS_W - brand_logo.width)//2, 160))
 
-        # 4. MAIN CONTENT (Moved up)
+        # 4. MAIN CONTENT (Smart Vertical & Horizontal Scaling)
         current_y = 480
-        MAX_TEXT_W = int(CANVAS_W * 0.8)  # 80% of screen width
+        MAX_TEXT_W = int(CANVAS_W * 0.8)   # 80% width
+        MAX_TITLE_H = 500                 # Maximum height allowed for the title area
 
-        # Logo / Fallback Title
         logo_path = self.get_media_logo(m_type, m_id)
+
         if logo_path:
             try:
                 l_res = requests.get(f"https://image.tmdb.org/t/p/original{logo_path}")
                 logo_img = Image.open(BytesIO(l_res.content)).convert("RGBA")
-                # Scale logo to fit 80% width max
-                ratio = min(MAX_TEXT_W/logo_img.width, 550/logo_img.height)
+                # Scale logo to fit both max width and max height
+                ratio = min(MAX_TEXT_W/logo_img.width, MAX_TITLE_H/logo_img.height)
                 logo_img = logo_img.resize((int(logo_img.width * ratio), int(logo_img.height * ratio)), Image.LANCZOS)
+
                 image.alpha_composite(logo_img, ((CANVAS_W - logo_img.width)//2, current_y))
-                current_y += logo_img.height + 50
+                current_y += logo_img.height + 40
             except:
-                logo_path = None # Trigger fallback if logo download fails
+                logo_path = None
 
         if not logo_path:
-            target_font_size = 300
-            f_title = self.get_font(target_font_size, title)
+            target_font_size = 280 # Slightly smaller starting point
 
-            # Wrap text first to handle long titles (like some Anime titles)
-            # 25-30 chars is usually safe for a 300pt font at 80% width
-            wrapped_title = textwrap.wrap(title, width=25)
+            while target_font_size > 80:
+                f_title = self.get_font(target_font_size, title)
+                # Wrap text - narrower wrap for larger fonts
+                wrap_width = 20 if target_font_size > 200 else 35
+                wrapped_lines = textwrap.wrap(title, width=wrap_width)
 
-            # Dynamically shrink font size if any line is still too wide
-            for line in wrapped_title:
-                while True:
-                    t_bbox = draw.textbbox((0, 0), line, font=f_title)
-                    line_w = t_bbox[2] - t_bbox[0]
-                    if line_w <= MAX_TEXT_W or target_font_size <= 100:
-                        break
+                # Calculate total height of all lines
+                total_h = 0
+                max_line_w = 0
+                line_data = []
+
+                for line in wrapped_lines:
+                    bbox = draw.textbbox((0, 0), line, font=f_title)
+                    w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+                    total_h += h + 20 # text + spacing
+                    max_line_w = max(max_line_w, w)
+                    line_data.append((line, w, h))
+
+                # Check if it fits BOTH width and height constraints
+                if max_line_w <= MAX_TEXT_W and total_h <= MAX_TITLE_H:
+                    # It fits! Draw it.
+                    for line, w, h in line_data:
+                        draw.text(((CANVAS_W - w)//2, current_y), line, font=f_title, fill="white")
+                        current_y += h + 20
+                    break
+                else:
+                    # Too big, shrink font and try again
                     target_font_size -= 20
-                    f_title = self.get_font(target_font_size, title)
 
-            # Draw the lines
-            for line in wrapped_title:
-                t_bbox = draw.textbbox((0, 0), line, font=f_title)
-                line_w = t_bbox[2] - t_bbox[0]
-                line_h = t_bbox[3] - t_bbox[1]
-                draw.text(((CANVAS_W - line_w)//2, current_y), line, font=f_title, fill="white")
-                current_y += line_h + 20 # Add small spacing between lines
+            # If the loop finishes without breaking, current_y needs a fallback increment
+            # but usually, current_y is already updated in the "if" block above.
 
-            current_y += 40 # Extra margin before info text
+        # Ensure current_y is at least at a certain point to keep layout consistent
+        current_y = max(current_y, 480 + MAX_TITLE_H + 20)
 
         # Info Text
         f_info = self.get_font(70)
@@ -273,14 +285,14 @@ if __name__ == "__main__":
 
     # Execution Lists
     targets = [
-        ("netflix", "New Release on ", True),
-        ("netflix", "Popular on ", False),
-        ("paramount", "New Release on ", True),
-        ("paramount", "Popular on ", False),
-        ("amazon", "New Release on ", True),
-        ("amazon", "Popular on ", False),
-        ("peacock", "New Release on ", True),
-        ("peacock", "Popular on ", False),
+        ("netflix", "New Release on", True),
+        ("netflix", "Popular on", False),
+        ("paramount", "New Release on", True),
+        ("paramount", "Popular on", False),
+        ("amazon", "New Release on", True),
+        ("amazon", "Popular on", False),
+        ("peacock", "New Release on", True),
+        ("peacock", "Popular on", False),
         ("anime_popular", "Popular Anime", False),
         ("anime_new", "New Seasonal Anime", True),
     ]
@@ -291,11 +303,11 @@ if __name__ == "__main__":
 
     # Define specialized Crunchyroll targets
     anime_targets = [
-        ("crunchyroll", "New on Crunchyroll", True),
-        ("crunchyroll", "Popular on Crunchyroll", False),
+        ("crunchyroll", "New on", True),
+        ("crunchyroll", "Popular on", False),
     ]
 
     for svc, label, new_rel in anime_targets:
         # Crunchyroll is 95% TV Series
-        bot.run(svc, is_movie=False, custom_label=label, limit=8, is_new_release=new_rel)
-        bot.run(svc, is_movie=True, custom_label=label, limit=5, is_new_release=new_rel)
+        bot.run(svc, is_movie=False, custom_label=label, limit=10, is_new_release=new_rel)
+        bot.run(svc, is_movie=True, custom_label=label, limit=10, is_new_release=new_rel)
