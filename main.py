@@ -34,7 +34,10 @@ SERVICES = {
     "apple":   {"id": 2552, "type": "network", "logo": "apple.png"},
     "peacock": {"id": 3353, "type": "network", "logo": "peacock.png"},
     "paramount": {"id": 4330, "type": "network", "logo": "paramount-logo.png"},
-    "trending": {"id": None, "type": "trending", "logo": "tmdblogo.png"}
+    "trending": {"id": None, "type": "trending", "logo": "tmdblogo.png"},
+    "crunchyroll": {"id": 1112, "type": "network", "logo": "crunchyroll.png"},
+    "anime_popular": {"id": None, "type": "anime", "logo": "tmdblogo.png"},
+    "anime_new": {"id": None, "type": "anime", "logo": "tmdblogo.png"}
 }
 
 def get_genres(media_type):
@@ -191,26 +194,57 @@ class MediaGenerator:
             json.dump(api_data, f, indent=4)
 
     def run(self, service_key, is_movie, custom_label, limit=5, is_new_release=False):
-        svc = SERVICES[service_key]
+        svc = SERVICES.get(service_key, SERVICES["trending"])
         m_type = "movie" if is_movie else "tv"
-        if svc["type"] == "network":
+
+        # 1. Start with the base Discover URL
+        # Discover is more powerful than Trending for specific filtering
+        url = f"{TMDB_BASE_URL}/discover/{m_type}?include_adult=false&language=en-US&sort_by=popularity.desc"
+
+        # 2. Logic for Anime (Popular and New Releases)
+        if "anime" in service_key.lower():
+            # Genre 16 is Animation, ja is Japanese
+            url += "&with_genres=16&with_original_language=ja"
+
+            if is_new_release:
+                # Seasonal anime usually releases within the last 90 days
+                date_min = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
+                date_param = "primary_release_date.gte" if is_movie else "first_air_date.gte"
+                url += f"&{date_param}={date_min}"
+
+        # 3. Logic for Streaming Networks (Netflix, Amazon, etc.)
+        elif svc["type"] == "network":
             param = "with_companies" if is_movie else "with_networks"
-            url = f"{TMDB_BASE_URL}/discover/{m_type}?{param}={svc['id']}"
+            url += f"&{param}={svc['id']}"
+
             if is_new_release:
                 date_min = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')
-                url += f"&{'primary_release_date' if is_movie else 'first_air_date'}.gte={date_min}&sort_by=popularity.desc"
-            else:
-                url += "&sort_by=popularity.desc"
-        else:
+                date_param = "primary_release_date.gte" if is_movie else "first_air_date.gte"
+                url += f"&{date_param}={date_min}"
+
+        # 4. Fallback for Trending (If not Anime or Network)
+        elif svc["type"] == "trending":
             url = f"{TMDB_BASE_URL}/trending/{m_type}/week"
 
-        results = requests.get(url, headers=HEADERS).json().get('results', [])
-        for item in results[:limit]:
-            try:
-                self.generate_image(item, is_movie, service_key, custom_label)
-            except Exception as e:
-                print(f"Skipping {item.get('id')}: {e}")
-        self.generate_api_json()
+        # Fetch and Process
+        try:
+            response = requests.get(url, headers=HEADERS)
+            response.raise_for_status()
+            results = response.json().get('results', [])
+
+            print(f"--- Processing {custom_label} ({m_type}) ---")
+            for item in results[:limit]:
+                try:
+                    # Add a small delay if you hit rate limits
+                    self.generate_image(item, is_movie, service_key, custom_label)
+                    print(f"Generated: {item.get('title') if is_movie else item.get('name')}")
+                except Exception as e:
+                    print(f"Skipping ID {item.get('id')}: {e}")
+
+            self.generate_api_json()
+
+        except Exception as e:
+            print(f"API Request failed for {service_key}: {e}")
 
 
 if __name__ == "__main__":
@@ -226,6 +260,8 @@ if __name__ == "__main__":
         ("amazon", "Popular on ", False),
         ("peacock", "New Release on ", True),
         ("peacock", "Popular on ", False),
+        ("anime_popular", "Popular Anime", False),
+        ("anime_new", "New Seasonal Anime", True),
     ]
 
     for svc, label, new_rel in targets:
