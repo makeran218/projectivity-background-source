@@ -8,6 +8,7 @@ import json
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import shutil
+import random
 
 load_dotenv(verbose=True)
 
@@ -218,54 +219,99 @@ class MediaGenerator:
         with open("api.json", "w") as f:
             json.dump(api_data, f, indent=4)
 
+    def run(self, service_key, is_movie, custom_label, limit=5, is_new_release=False):
+        svc = SERVICES.get(service_key, SERVICES["trending"])
+        m_type = "movie" if is_movie else "tv"
+
+        # Base Discover URL
+        base_discover_url = f"{TMDB_BASE_URL}/discover/{m_type}?include_adult=false&language=en-US&sort_by=popularity.desc"
+
+        if service_key == "crunchyroll" or "anime" in service_key.lower():
+            base_discover_url += "&with_genres=16&with_original_language=ja"
+            if service_key == "crunchyroll" and not is_movie:
+                base_discover_url += f"&with_networks={svc['id']}"
+            if is_new_release:
+                date_min = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
+                p = "primary_release_date.gte" if is_movie else "first_air_date.gte"
+                base_discover_url += f"&{p}={date_min}"
+        elif svc["type"] == "network":
+            param = "with_companies" if is_movie else "with_networks"
+            base_discover_url += f"&{param}={svc['id']}"
+            if is_new_release:
+                date_min = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')
+                p = "primary_release_date.gte" if is_movie else "first_air_date.gte"
+                base_discover_url += f"&{p}={date_min}"
+        else:
+            base_discover_url = f"{TMDB_BASE_URL}/trending/{m_type}/week"
+
+        try:
+            # We fetch 3 pages (60 items) to have a larger pool for randomization
+            all_potential_results = []
+            pages_to_fetch = 3 if "trending" not in base_discover_url else 1
+
+            for page in range(1, pages_to_fetch + 1):
+                paged_url = f"{base_discover_url}&page={page}" if "?" in base_discover_url else base_discover_url
+                res = requests.get(paged_url, headers=HEADERS).json()
+                all_potential_results.extend(res.get('results', []))
+                if "trending" in base_discover_url: break # Trending only has 1 page
+
+            # --- Randomization ---
+            if all_potential_results:
+                sample_size = min(len(all_potential_results), limit)
+                selected_items = random.sample(all_potential_results, sample_size)
+            else:
+                selected_items = []
+
+            for item in selected_items:
+                try:
+                    self.generate_image(item, is_movie, service_key, custom_label)
+                except Exception as e:
+                    print(f"Skipping {item.get('id')}: {e}")
+
+            self.generate_api_json()
+        except Exception as e:
+            print(f"API Error in run(): {e}")
+
     def run_trakt(self, username, list_name):
         url = f"https://api.trakt.tv/users/{username}/lists/{list_name}/items"
-        t_headers = {"Content-Type": "application/json", "trakt-api-version": "2", "trakt-api-key": TRAKT_API_KEY}
+        t_headers = {
+            "Content-Type": "application/json",
+            "trakt-api-version": "2",
+            "trakt-api-key": TRAKT_API_KEY
+        }
         try:
             res = requests.get(url, headers=t_headers)
             if res.status_code == 200:
                 items = res.json()
-                for item in items[:20]:
+
+                # --- Randomization ---
+                # We pick up to 20 random items from your entire Trakt list
+                if items:
+                    sample_size = min(len(items), 20)
+                    selected_items = random.sample(items, sample_size)
+                else:
+                    selected_items = []
+
+                for item in selected_items:
                     m_type = item['type']
+                    # Skip if not movie or show
+                    if m_type not in ['movie', 'show']: continue
+
                     tmdb_id = item[m_type]['ids']['tmdb']
+                    is_movie = (m_type == 'movie')
+
                     try:
-                        self.generate_image({'id': tmdb_id}, (m_type == 'movie'), "trakt", "Featured on")
+                        # Passing a dummy dict with ID so generate_image can fetch full details
+                        self.generate_image({'id': tmdb_id}, is_movie, "trakt", "Lastest Release on")
                         print(f"Generated Trakt {m_type}: {tmdb_id}")
-                    except Exception as e: print(f"Error processing Trakt item {tmdb_id}: {e}")
-            else: print(f"Trakt API Error: {res.status_code}")
+                    except Exception as e:
+                        print(f"Error processing Trakt item {tmdb_id}: {e}")
+            else:
+                print(f"Trakt API Error: {res.status_code} - Check your TRAKT_API_KEY secret.")
+
             self.generate_api_json()
-        except Exception as e: print(f"Trakt request failed: {e}")
-
-    def run(self, service_key, is_movie, custom_label, limit=5, is_new_release=False):
-        svc = SERVICES.get(service_key, SERVICES["trending"])
-        m_type = "movie" if is_movie else "tv"
-        url = f"{TMDB_BASE_URL}/discover/{m_type}?include_adult=false&language=en-US&sort_by=popularity.desc"
-
-        if service_key == "crunchyroll" or "anime" in service_key.lower():
-            url += "&with_genres=16&with_original_language=ja"
-            if service_key == "crunchyroll" and not is_movie:
-                url += f"&with_networks={svc['id']}"
-            if is_new_release:
-                date_min = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
-                p = "primary_release_date.gte" if is_movie else "first_air_date.gte"
-                url += f"&{p}={date_min}"
-        elif svc["type"] == "network":
-            param = "with_companies" if is_movie else "with_networks"
-            url += f"&{param}={svc['id']}"
-            if is_new_release:
-                date_min = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')
-                p = "primary_release_date.gte" if is_movie else "first_air_date.gte"
-                url += f"&{p}={date_min}"
-        else:
-            url = f"{TMDB_BASE_URL}/trending/{m_type}/week"
-
-        try:
-            results = requests.get(url, headers=HEADERS).json().get('results', [])
-            for item in results[:limit]:
-                try: self.generate_image(item, is_movie, service_key, custom_label)
-                except Exception as e: print(f"Skipping {item.get('id')}: {e}")
-            self.generate_api_json()
-        except Exception as e: print(f"API Error: {e}")
+        except Exception as e:
+            print(f"Trakt request failed: {e}")
 
 if __name__ == "__main__":
     bot = MediaGenerator()
