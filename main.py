@@ -24,7 +24,7 @@ TRAKT_LISTNAME = "latest-releases"
 HEADERS = {"accept": "application/json", "Authorization": f"Bearer {TMDB_BEARER_TOKEN}"}
 
 # Font Paths
-TITLE_FONT_PATH = 'BebasNeue-Regular.ttf'
+TITLE_FONT_PATH = 'Jersey25-Regular.ttf'
 BODY_FONT_PATH = 'Roboto-Light.ttf'
 FALLBACK_FONT_PATH = 'NotoSansCJK-Regular.ttc'
 
@@ -69,8 +69,8 @@ class MediaGenerator:
 
     def download_fonts(self):
         if not os.path.exists(TITLE_FONT_PATH):
-            print("Downloading Bebas Neue...")
-            url = 'https://github.com/google/fonts/raw/main/ofl/bebasneue/BebasNeue-Regular.ttf'
+            print("Downloading Title font...")
+            url = 'https://github.com/google/fonts/raw/refs/heads/main/ofl/jersey25/Jersey25-Regular.ttf'
             r = requests.get(url)
             with open(TITLE_FONT_PATH, 'wb') as f: f.write(r.content)
 
@@ -164,25 +164,36 @@ class MediaGenerator:
         if not logo_path:
             is_cjk = any(ord(c) > 0x4e00 for c in title)
             display_title = title.upper() if not is_cjk else title
+
+            # Rubik 80s Fade is stylistically large; starting at 350
             target_font_size = 350 if not is_cjk else 250
+            title_color = "#dce8a2"
+
             while target_font_size > 80:
                 f_title = self.get_font(target_font_size, display_title, is_title=True)
-                wrap_val = (25 if target_font_size > 250 else 40) if not is_cjk else 15
+                wrap_val = (18 if target_font_size > 250 else 30) if not is_cjk else 15
                 wrapped_lines = textwrap.wrap(display_title, width=wrap_val)
                 total_h, line_data = 0, []
+
                 for line in wrapped_lines:
                     bbox = draw.textbbox((0, 0), line, font=f_title)
                     w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
-                    total_h += h + 20
+                    total_h += h + 25 # Increased spacing for the fade effect
                     line_data.append((line, w, h))
+
                 if max([d[1] for d in line_data]) <= MAX_TEXT_W and total_h <= MAX_TITLE_H:
-                    shadow_offset = 3
+                    shadow_offset = 5 # Heavier shadow for retro look
                     for line, w, h in line_data:
-                        draw.text(((CANVAS_W - w)//2 + shadow_offset, current_y + shadow_offset), line, font=f_title, fill=(0, 0, 0, 180))
-                        draw.text(((CANVAS_W - w)//2, current_y), line, font=f_title, fill="white")
-                        current_y += h + 20
+                        # Draw Shadow (Deep Black for contrast)
+                        draw.text(((CANVAS_W - w)//2 + shadow_offset, current_y + shadow_offset),
+                                  line, font=f_title, fill=(0, 0, 0, 220))
+                        # Draw Text in Pale Lime (#dce8a2)
+                        draw.text(((CANVAS_W - w)//2, current_y),
+                                  line, font=f_title, fill=title_color)
+                        current_y += h + 25
                     break
-                else: target_font_size -= 20
+                else:
+                    target_font_size -= 20
 
         current_y = max(current_y, 480 + MAX_TITLE_H + 20)
 
