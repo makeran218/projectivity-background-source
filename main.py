@@ -95,6 +95,32 @@ class MediaGenerator:
             return top['file_path']
         except: return None
 
+    def get_certification(self, media_type, media_id):
+        if media_type == "movie":
+            url = f"{TMDB_BASE_URL}/movie/{media_id}/release_dates"
+        else:
+            url = f"{TMDB_BASE_URL}/tv/{media_id}/content_ratings"
+        try:
+            data = requests.get(url, headers=HEADERS).json()
+            results = data.get("results", [])
+
+            # Both movie release_dates and tv content_ratings return a list
+            for entry in results:
+                if entry.get("iso_3166_1") == "US":
+                    if media_type == "movie":
+                        for rd in entry.get("release_dates", []):
+                            cert = rd.get("certification", "")
+                            if cert:
+                                return cert
+                    else:
+                        cert = entry.get("rating", "")
+                        if cert:
+                            return cert
+
+            return ""
+        except:
+            return ""
+
     def generate_image(self, item, is_movie, service_key, custom_label):
         m_type, m_id = ("movie" if is_movie else "tv"), item["id"]
         details = self.get_details(m_type, m_id)
@@ -123,6 +149,9 @@ class MediaGenerator:
         else:
             seasons = details.get("number_of_seasons") or 1
             extra = f"{seasons} Season" + ("s" if seasons != 1 else "")
+
+        # Certification (US rating like PG-13, TV-14, etc.)
+        certification = self.get_certification(m_type, m_id)
 
         rating = details.get("vote_average") or 0
         rating = round(rating, 1)
@@ -463,100 +492,152 @@ class MediaGenerator:
         if extra:
             info_parts.append(extra)
 
-        info_text = "  •  ".join(info_parts)
+        if certification:
+            info_parts.append(certification)
 
-        f_info = self.get_font(
-            48,
-            info_text,
-            is_title=False
-        )
+        # Metadata — draw segments with red dots between them
+        dot_font = self.get_font(48, "•", is_title=False)
+        text_font = self.get_font(48, "", is_title=False)
 
-        # Metadata
-        draw.text(
-            (LEFT + 2, current_y + 2),
-            info_text,
-            font=f_info,
-            fill=(0, 0, 0, 180)
-        )
+        def get_width(font, text):
+            b = font.getbbox(text)
+            return b[2] - b[0]
 
-        draw.text(
-            (LEFT, current_y),
-            info_text,
-            font=f_info,
-            fill=(225, 225, 225, 255)
-        )
+        def get_height(font, text):
+            b = font.getbbox(text)
+            return b[3] - b[1]
+
+        parts_x = []  # (text, x, is_dot)
+        cert_idx = None  # index of certification in parts_x
+        x = LEFT
+
+        for i, part in enumerate(info_parts):
+            is_cert = (part == certification)
+            parts_x.append((part, x, False, is_cert))
+            if is_cert:
+                cert_idx = len(parts_x) - 1
+            x += get_width(text_font, part)
+            if i < len(info_parts) - 1:
+                x += 20
+                parts_x.append(("•", x, True, False))
+                if is_cert:
+                    x += 15
+                x += get_width(dot_font, "•") + 30
+
+        # Shadow (all parts, offset)
+        for text, px, is_dot, is_cert in parts_x:
+            color = (200, 30, 30, 255) if is_dot else (0, 0, 0, 180)
+            draw.text(
+                (px + 2, current_y + 4),
+                text,
+                font=dot_font if is_dot else text_font,
+                fill=color
+            )
+
+        # Certification badge — rounded box with white border
+        if cert_idx is not None:
+            _, cx, _, _ = parts_x[cert_idx]
+            cert_text = info_parts[-1]
+            tw = get_width(text_font, cert_text)
+            th = get_height(text_font, cert_text)
+            pad_x = 15
+            pad_y = 20
+            radius = 3
+
+            bx1, by1 = cx - pad_x, current_y + 14 - pad_y
+            bx2, by2 = cx + tw + pad_x, current_y + 14 + th + pad_y
+
+            # Draw border 3 times to simulate stroke_width (compatibility)
+            for offset in (-1, 0, 1):
+                draw.rounded_rectangle(
+                    (bx1 + offset, by1 + offset, bx2 + offset, by2 + offset),
+                    radius=radius,
+                    outline=(255, 255, 255, 255)
+                )
+
+        # Main text
+        for text, px, is_dot, is_cert in parts_x:
+            if is_dot:
+                color = (200, 30, 30, 255)
+            elif is_cert:
+                color = (255, 255, 255, 255)
+            else:
+                color = (225, 225, 225, 255)
+            draw.text(
+                (px, current_y + 2),
+                text,
+                font=dot_font if is_dot else text_font,
+                fill=color
+            )
 
         current_y += 85
 
         # ============================================================
-        # RATING
+        # RATING (only if valid / non-zero)
         # ============================================================
 
-        # ============================================================
-        # RATING
-        # DRAW STAR MANUALLY SO IT ALWAYS APPEARS
-        # ============================================================
+        if rating and float(rating) > 0:
 
-        rating_y = current_y + 5
+            rating_y = current_y + 5
 
-        # ------------------------------------------------------------
-        # Draw 5-point star
-        # ------------------------------------------------------------
+            # ------------------------------------------------------------
+            # Draw 5-point star
+            # ------------------------------------------------------------
 
-        cx = LEFT + 25
-        cy = rating_y + 32
+            cx = LEFT + 25
+            cy = rating_y + 32
 
-        outer_radius = 28
-        inner_radius = 12
+            outer_radius = 28
+            inner_radius = 12
 
-        points = []
+            points = []
 
-        import math
+            import math
 
-        for i in range(10):
-            angle = -math.pi / 2 + (i * math.pi / 5)
+            for i in range(10):
+                angle = -math.pi / 2 + (i * math.pi / 5)
 
-            radius = (
-                outer_radius
-                if i % 2 == 0
-                else inner_radius
+                radius = (
+                    outer_radius
+                    if i % 2 == 0
+                    else inner_radius
+                )
+
+                x = cx + math.cos(angle) * radius
+                y = cy + math.sin(angle) * radius
+
+                points.append((x, y))
+
+            draw.polygon(
+                points,
+                fill=(255, 210, 80, 255)
             )
 
-            x = cx + math.cos(angle) * radius
-            y = cy + math.sin(angle) * radius
+            # ------------------------------------------------------------
+            # Rating number
+            # ------------------------------------------------------------
 
-            points.append((x, y))
+            rating_text = str(rating)
 
-        draw.polygon(
-            points,
-            fill=(255, 210, 80, 255)
-        )
+            f_rating = self.get_font(
+                58,
+                rating_text,
+                is_title=False
+            )
 
-        # ------------------------------------------------------------
-        # Rating number
-        # ------------------------------------------------------------
+            draw.text(
+                (
+                    LEFT + 70,
+                    current_y
+                ),
+                rating_text,
+                font=f_rating,
+                fill=(255, 255, 255, 255),
+                stroke_width=1,
+                stroke_fill=(0, 0, 0, 160)
+            )
 
-        rating_text = str(rating)
-
-        f_rating = self.get_font(
-            58,
-            rating_text,
-            is_title=False
-        )
-
-        draw.text(
-            (
-                LEFT + 70,
-                current_y
-            ),
-            rating_text,
-            font=f_rating,
-            fill=(255, 255, 255, 255),
-            stroke_width=1,
-            stroke_fill=(0, 0, 0, 160)
-        )
-
-        current_y += 100
+            current_y += 100
 
         # ============================================================
         # OVERVIEW / DESCRIPTION
