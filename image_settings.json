@@ -1,0 +1,63 @@
+{
+  "canvas": {
+    "width": 3840,
+    "height": 2160
+  },
+  "gradient": {
+    "start_x": 0,
+    "end_x": 2100,
+    "max_alpha": 255
+  },
+  "layout": {
+    "left_margin": 260,
+    "content_width": 1550,
+    "start_y": 250
+  },
+  "label": {
+    "font_size": 35,
+    "spacing_after": 65
+  },
+  "service_logo": {
+    "height": 72,
+    "spacing_after": 55
+  },
+  "title_logo": {
+    "max_width": 1350,
+    "max_height": 100,
+    "spacing_after": 55
+  },
+  "fallback_title": {
+    "max_font_size": 155,
+    "cjk_max_font_size": 125,
+    "min_font_size": 80,
+    "line_extra_spacing": 12,
+    "bottom_padding": 35
+  },
+  "metadata": {
+    "font_size": 35,
+    "spacing_after": 85,
+    "cert_padding_x": 15,
+    "cert_padding_y": 20,
+    "cert_radius": 3,
+    "shadow_offset_x": 2,
+    "shadow_offset_y": 4
+  },
+  "rating": {
+    "star_cx_offset": 25,
+    "star_cy_offset": 32,
+    "outer_radius": 28,
+    "inner_radius": 12,
+    "text_x_offset": 70,
+    "spacing_after": 100,
+    "font_size": 58
+  },
+  "overview": {
+    "font_size": 43,
+    "max_lines": 3,
+    "line_spacing": 62
+  },
+  "output": {
+    "quality": 92,
+    "use_vignette": true
+  }
+}
