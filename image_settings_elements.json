@@ -1,0 +1,63 @@
+{
+  "label": {
+    "x": 260,
+    "y": 250,
+    "w": 576,
+    "h": 42,
+    "type": "text",
+    "text": "NETFLIX",
+    "color": "#ebebeb",
+    "fontSize": 35
+  },
+  "service_logo": {
+    "x": 260,
+    "y": 357,
+    "w": 460.79999999999995,
+    "h": 72,
+    "type": "image"
+  },
+  "title_logo": {
+    "x": 260,
+    "y": 484,
+    "w": 1344,
+    "h": 307,
+    "type": "image"
+  },
+  "title": {
+    "x": 266,
+    "y": 627,
+    "w": 1344,
+    "h": 186,
+    "type": "text",
+    "text": "DUMMY SHOW",
+    "color": "#fff",
+    "fontSize": 155
+  },
+  "metadata": {
+    "x": 266,
+    "y": 927,
+    "w": 1536,
+    "h": 77,
+    "type": "text",
+    "text": "Action, Drama \u2022 2024 \u2022 2h 15m \u2022 PG-13",
+    "color": "#e1e1e1",
+    "fontSize": 48
+  },
+  "rating": {
+    "x": 269,
+    "y": 1087,
+    "w": 192,
+    "h": 70,
+    "type": "star"
+  },
+  "overview": {
+    "x": 487,
+    "y": 1094,
+    "w": 1536,
+    "h": 52,
+    "type": "text",
+    "text": "A thrilling journey through uncharted territories where heroes must face their deepest fears...",
+    "color": "#f5f5f5",
+    "fontSize": 43
+  }
+}
