@@ -25,9 +25,100 @@ FALLBACK_FONT_PATH = 'NotoSansCJK-Regular.ttc'
 BACKGROUND_DIR = "tmdb_backgrounds"
 BASE_URL_FOR_API = "https://makeran218.github.io/projectivity-background-source"
 
-# 4K Canvas
-CANVAS_W = 3840
-CANVAS_H = 2160
+# --- Image settings (loaded from image_settings.json, overrides hardcoded defaults) ---
+def _load_image_settings():
+    """Load image output settings from JSON config file."""
+    default = {
+        "canvas": {"width": 3840, "height": 2160},
+        "gradient": {"start_x": 0, "end_x": 2100, "max_alpha": 205},
+        "layout": {"left_margin": 260, "content_width": 1550, "start_y": 250},
+        "label": {"font_size": 42, "spacing_after": 65},
+        "service_logo": {"height": 75, "spacing_after": 55},
+        "title_logo": {"max_width": 1350, "max_height": 420, "spacing_after": 55},
+        "fallback_title": {"max_font_size": 155, "cjk_max_font_size": 125, "min_font_size": 80, "line_extra_spacing": 12, "bottom_padding": 35, "shadow_offset_x": 5, "shadow_offset_y": 5},
+        "metadata": {"font_size": 48, "spacing_after": 85, "cert_padding_x": 15, "cert_padding_y": 20, "cert_radius": 3, "shadow_offset_x": 2, "shadow_offset_y": 4, "cert_y_offset": 14, "text_y_offset": 2, "dot_spacing": 20, "cert_dot_extra": 15, "dot_width_extra": 30},
+        "rating": {"star_cx_offset": 25, "star_cy_offset": 32, "outer_radius": 28, "inner_radius": 12, "text_x_offset": 70, "spacing_after": 100, "font_size": 58, "star_y_offset": 5},
+        "overview": {"font_size": 43, "max_lines": 3, "line_spacing": 62, "shadow_offset_x": 2, "shadow_offset_y": 2},
+        "output": {"quality": 92, "use_vignette": True},
+    }
+    path = "image_settings.json"
+    if os.path.exists(path):
+        try:
+            with open(path) as f:
+                saved = json.load(f)
+            # Deep merge: saved values override defaults
+            def _merge(base, override):
+                for k, v in override.items():
+                    if k in base and isinstance(base[k], dict) and isinstance(v, dict):
+                        _merge(base[k], v)
+                    else:
+                        base[k] = v
+            _merge(default, saved)
+            print(f"Loaded image settings from {path}")
+            return default
+        except Exception as e:
+            print(f"Failed to load {path}: {e}. Using defaults.")
+    return default
+
+IMG = _load_image_settings()
+
+# ---------------------------------------------------------------------------
+# Element positions from the web GUI  (image_settings_elements.json)
+# ---------------------------------------------------------------------------
+_elements_cache = None
+
+def _load_elements():
+    """Load element positions from the GUI's elements JSON file."""
+    global _elements_cache
+    if _elements_cache is not None:
+        return _elements_cache
+    path = "image_settings_elements.json"
+    if os.path.exists(path):
+        try:
+            with open(path) as f:
+                _elements_cache = json.load(f)
+            print(f"Loaded element positions from {path}")
+        except Exception as e:
+            print(f"Failed to load {path}: {e}. Using defaults.")
+            _elements_cache = {}
+    else:
+        _elements_cache = {}
+    return _elements_cache
+
+
+def _el(type_key, field, default=None):
+    """Get a field from an element: _el('label', 'x') -> 260"""
+    elems = _load_elements()
+    el = elems.get(type_key, {})
+    return el.get(field, default)
+
+
+def _el_x(type_key):
+    return _el(type_key, "x", _g("layout", "left_margin", 260))
+
+
+def _el_y(type_key):
+    return _el(type_key, "y", _g("layout", "start_y", 250))
+
+
+def _el_w(type_key):
+    return _el(type_key, "w", _g("layout", "content_width", 1550))
+
+
+def _el_h(type_key):
+    return _el(type_key, "h", _g("title_logo", "max_height", 420))
+
+# Flattened accessor helpers
+def _g(section, field, default=None):
+    """Get a nested config value: _g('canvas', 'width')"""
+    try:
+        return IMG[section][field]
+    except (KeyError, TypeError):
+        return default
+
+# 4K Canvas (configurable)
+CANVAS_W = _g("canvas", "width", 3840)
+CANVAS_H = _g("canvas", "height", 2160)
 
 SERVICES = {
     "netflix": {"id": 8, "type": "provider", "logo": "netflix_logo.png"},
@@ -178,7 +269,7 @@ class MediaGenerator:
         ).convert("RGBA")
 
         # ============================================================
-        # CROP TO 3840x2160
+        # CROP TO CANVAS SIZE (configurable)
         # ============================================================
 
         target_ratio = CANVAS_W / CANVAS_H
@@ -211,11 +302,14 @@ class MediaGenerator:
         )
 
         # ============================================================
-        # DARK LEFT GRADIENT
+        # DARK LEFT GRADIENT (configurable)
         #
         # This is the most important visual change.
         # It makes text readable without destroying the backdrop.
         # ============================================================
+
+        grad_end_x = _g("gradient", "end_x", 2100)
+        grad_max_alpha = _g("gradient", "max_alpha", 205)
 
         gradient = Image.new(
             "RGBA",
@@ -227,8 +321,8 @@ class MediaGenerator:
 
         for x in range(CANVAS_W):
             # Strongest at left, fades toward center/right.
-            if x < 2100:
-                strength = int(205 * (1 - x / 2100))
+            if x < grad_end_x:
+                strength = int(grad_max_alpha * (1 - x / grad_end_x))
             else:
                 strength = 0
 
@@ -243,10 +337,10 @@ class MediaGenerator:
         image.alpha_composite(gradient)
 
         # ============================================================
-        # OPTIONAL EXISTING VIGNETTE
+        # OPTIONAL EXISTING VIGNETTE (configurable)
         # ============================================================
 
-        if os.path.exists("vignette.png"):
+        if _g("output", "use_vignette", True) and os.path.exists("vignette.png"):
             try:
                 vig = Image.open("vignette.png").convert("RGBA")
                 vig = vig.resize(
@@ -260,23 +354,18 @@ class MediaGenerator:
         draw = ImageDraw.Draw(image)
 
         # ============================================================
-        # LAYOUT
+        # LAYOUT — use absolute positions from GUI elements
         # ============================================================
 
-        LEFT = 260
-        CONTENT_WIDTH = 1550
+        CONTENT_WIDTH = _g("layout", "content_width", 1550)  # default fallback
 
-        current_y = 250
+        # --------------------------------------------------------
+        # SERVICE LABEL  (position from elements)
+        # --------------------------------------------------------
 
-
-
-        # ============================================================
-        # SERVICE LABEL
-        # LABEL FIRST, SERVICE LOGO BELOW
-        # ============================================================
-
+        label_font_size = _g("label", "font_size", 42)
         f_label = self.get_font(
-            42,
+            label_font_size,
             custom_label,
             is_title=False
         )
@@ -284,7 +373,7 @@ class MediaGenerator:
         label_text = custom_label.upper()
 
         draw.text(
-            (LEFT, current_y),
+            (_el_x("label"), _el_y("label")),
             label_text,
             font=f_label,
             fill=(235, 235, 235, 230),
@@ -292,7 +381,8 @@ class MediaGenerator:
             stroke_fill=(0, 0, 0, 160)
         )
 
-        current_y += 65
+        # Service logo position follows label (configurable or from elements)
+        svc_logo_y = _el_y("service_logo")
 
         # Service logo BELOW the label
         if os.path.exists(svc["logo"]):
@@ -302,7 +392,7 @@ class MediaGenerator:
                     svc["logo"]
                 ).convert("RGBA")
 
-                LOGO_H = 75
+                LOGO_H = _g("service_logo", "height", 75)
 
                 ratio = LOGO_H / brand_logo.height
 
@@ -316,10 +406,8 @@ class MediaGenerator:
 
                 image.alpha_composite(
                     brand_logo,
-                    (LEFT, current_y)
+                    (_el_x("service_logo"), svc_logo_y)
                 )
-
-                current_y += LOGO_H + 55
 
             except Exception:
                 pass
@@ -335,6 +423,10 @@ class MediaGenerator:
 
         used_logo = False
 
+        # --------------------------------------------------------
+        # TITLE LOGO  (position from elements)
+        # --------------------------------------------------------
+
         if logo_path:
 
             try:
@@ -348,9 +440,8 @@ class MediaGenerator:
                     BytesIO(l_res.content)
                 ).convert("RGBA")
 
-                # Much smaller than your current 80% canvas width.
-                MAX_LOGO_W = 1350
-                MAX_LOGO_H = 420
+                MAX_LOGO_W = _el_w("title_logo")
+                MAX_LOGO_H = _el_h("title_logo")
 
                 ratio = min(
                     MAX_LOGO_W / logo_img.width,
@@ -368,20 +459,19 @@ class MediaGenerator:
                 image.alpha_composite(
                     logo_img,
                     (
-                        LEFT,
-                        current_y
+                        _el_x("title_logo"),
+                        _el_y("title_logo")
                     )
                 )
 
-                current_y += logo_img.height + 55
                 used_logo = True
 
             except Exception:
                 used_logo = False
 
-        # ============================================================
-        # FALLBACK TITLE
-        # ============================================================
+        # --------------------------------------------------------
+        # FALLBACK TITLE  (position from elements)
+        # --------------------------------------------------------
 
         if not used_logo:
 
@@ -396,12 +486,15 @@ class MediaGenerator:
                 else title.upper()
             )
 
-            # More restrained than the old 350px title.
             target_font_size = (
-                155 if not is_cjk else 125
+                _g("fallback_title", "cjk_max_font_size", 125)
+                if is_cjk
+                else _g("fallback_title", "max_font_size", 155)
             )
 
-            while target_font_size >= 80:
+            title_width = _el_w("title_logo") or CONTENT_WIDTH
+
+            while target_font_size >= _g("fallback_title", "min_font_size", 80):
 
                 f_title = self.get_font(
                     target_font_size,
@@ -425,7 +518,7 @@ class MediaGenerator:
                         font=f_title
                     )
 
-                    if bbox[2] - bbox[0] <= CONTENT_WIDTH:
+                    if bbox[2] - bbox[0] <= title_width:
                         line = test
                     else:
                         if line:
@@ -440,6 +533,10 @@ class MediaGenerator:
 
                 target_font_size -= 10
 
+            # Track title Y position locally (multi-line titles)
+            title_y = _el_y("title_logo")
+            title_x = _el_x("title_logo")
+
             for line in lines:
 
                 bbox = draw.textbbox(
@@ -448,13 +545,11 @@ class MediaGenerator:
                     font=f_title
                 )
 
-                w = bbox[2] - bbox[0]
-
                 # Shadow
                 draw.text(
                     (
-                        LEFT + 5,
-                        current_y + 5
+                        title_x + _g("fallback_title", "shadow_offset_x", 5),
+                        title_y + _g("fallback_title", "shadow_offset_y", 5)
                     ),
                     line,
                     font=f_title,
@@ -463,23 +558,23 @@ class MediaGenerator:
 
                 draw.text(
                     (
-                        LEFT,
-                        current_y
+                        title_x,
+                        title_y
                     ),
                     line,
                     font=f_title,
                     fill=(255, 255, 255, 255)
                 )
 
-                current_y += (
+                title_y += (
                     bbox[3] - bbox[1]
-                ) + 12
+                ) + _g("fallback_title", "line_extra_spacing", 12)
 
-            current_y += 35
+            title_y += _g("fallback_title", "bottom_padding", 35)
 
-        # ============================================================
-        # METADATA
-        # ============================================================
+        # --------------------------------------------------------
+        # METADATA  (position from elements)
+        # --------------------------------------------------------
 
         info_parts = []
 
@@ -495,9 +590,9 @@ class MediaGenerator:
         if certification:
             info_parts.append(certification)
 
-        # Metadata — draw segments with red dots between them
-        dot_font = self.get_font(48, "•", is_title=False)
-        text_font = self.get_font(48, "", is_title=False)
+        meta_font_size = _g("metadata", "font_size", 48)
+        dot_font = self.get_font(meta_font_size, "•", is_title=False)
+        text_font = self.get_font(meta_font_size, "", is_title=False)
 
         def get_width(font, text):
             b = font.getbbox(text)
@@ -507,9 +602,11 @@ class MediaGenerator:
             b = font.getbbox(text)
             return b[3] - b[1]
 
-        parts_x = []  # (text, x, is_dot)
-        cert_idx = None  # index of certification in parts_x
-        x = LEFT
+        parts_x = []
+        cert_idx = None
+        meta_x = _el_x("metadata")
+        meta_width = _el_w("metadata") or CONTENT_WIDTH
+        x = meta_x
 
         for i, part in enumerate(info_parts):
             is_cert = (part == certification)
@@ -518,21 +615,27 @@ class MediaGenerator:
                 cert_idx = len(parts_x) - 1
             x += get_width(text_font, part)
             if i < len(info_parts) - 1:
-                x += 20
+                x += _g("metadata", "dot_spacing", 20)
                 parts_x.append(("•", x, True, False))
                 if is_cert:
-                    x += 15
-                x += get_width(dot_font, "•") + 30
+                    x += _g("metadata", "cert_dot_extra", 15)
+                x += get_width(dot_font, "•") + _g("metadata", "dot_width_extra", 30)
+
+        meta_y = _el_y("metadata")
 
         # Shadow (all parts, offset)
         for text, px, is_dot, is_cert in parts_x:
             color = (200, 30, 30, 255) if is_dot else (0, 0, 0, 180)
             draw.text(
-                (px + 2, current_y + 4),
+                (px + _g("metadata", "shadow_offset_x", 2), meta_y + _g("metadata", "shadow_offset_y", 4)),
                 text,
                 font=dot_font if is_dot else text_font,
                 fill=color
             )
+
+        # Clamp metadata parts to element width
+        if meta_width < CANVAS_W:
+            parts_x = [(t, p, d, c) for t, p, d, c in parts_x if p + get_width(dot_font if d else text_font, t) <= meta_x + meta_width]
 
         # Certification badge — rounded box with white border
         if cert_idx is not None:
@@ -540,12 +643,12 @@ class MediaGenerator:
             cert_text = info_parts[-1]
             tw = get_width(text_font, cert_text)
             th = get_height(text_font, cert_text)
-            pad_x = 15
-            pad_y = 20
-            radius = 3
+            pad_x = _g("metadata", "cert_padding_x", 15)
+            pad_y = _g("metadata", "cert_padding_y", 20)
+            radius = _g("metadata", "cert_radius", 3)
 
-            bx1, by1 = cx - pad_x, current_y + 14 - pad_y
-            bx2, by2 = cx + tw + pad_x, current_y + 14 + th + pad_y
+            bx1, by1 = cx - pad_x, meta_y + _g("metadata", "cert_y_offset", 14) - pad_y
+            bx2, by2 = cx + tw + pad_x, meta_y + _g("metadata", "cert_y_offset", 14) + th + pad_y
 
             # Draw border 3 times to simulate stroke_width (compatibility)
             for offset in (-1, 0, 1):
@@ -564,31 +667,29 @@ class MediaGenerator:
             else:
                 color = (225, 225, 225, 255)
             draw.text(
-                (px, current_y + 2),
+                (px, meta_y + _g("metadata", "text_y_offset", 2)),
                 text,
                 font=dot_font if is_dot else text_font,
                 fill=color
             )
 
-        current_y += 85
-
-        # ============================================================
-        # RATING (only if valid / non-zero)
-        # ============================================================
+        # --------------------------------------------------------
+        # RATING  (position from elements)
+        # --------------------------------------------------------
 
         if rating and float(rating) > 0:
 
-            rating_y = current_y + 5
+            rating_y = _el_y("rating") + _g("rating", "star_y_offset", 5)
 
             # ------------------------------------------------------------
             # Draw 5-point star
             # ------------------------------------------------------------
 
-            cx = LEFT + 25
-            cy = rating_y + 32
+            cx = _el_x("rating") + _g("rating", "star_cx_offset", 25)
+            cy = rating_y + _g("rating", "star_cy_offset", 32)
 
-            outer_radius = 28
-            inner_radius = 12
+            outer_radius = _g("rating", "outer_radius", 28)
+            inner_radius = _g("rating", "inner_radius", 12)
 
             points = []
 
@@ -620,15 +721,15 @@ class MediaGenerator:
             rating_text = str(rating)
 
             f_rating = self.get_font(
-                58,
+                _g("rating", "font_size", 58),
                 rating_text,
                 is_title=False
             )
 
             draw.text(
                 (
-                    LEFT + 70,
-                    current_y
+                    _el_x("rating") + _g("rating", "text_x_offset", 70),
+                    _el_y("rating")
                 ),
                 rating_text,
                 font=f_rating,
@@ -637,22 +738,21 @@ class MediaGenerator:
                 stroke_fill=(0, 0, 0, 160)
             )
 
-            current_y += 100
-
-        # ============================================================
-        # OVERVIEW / DESCRIPTION
-        # ============================================================
+        # --------------------------------------------------------
+        # OVERVIEW  (position from elements)
+        # --------------------------------------------------------
 
         if overview:
 
             f_ov = self.get_font(
-                43,
+                _g("overview", "font_size", 43),
                 overview,
                 is_title=False
             )
 
-            # Wrap based on pixel width rather than
-            # an arbitrary character count.
+            overview_x = _el_x("overview")
+            overview_width = _el_w("overview") or CONTENT_WIDTH
+
             words = overview.split()
             lines = []
             line = ""
@@ -669,7 +769,7 @@ class MediaGenerator:
                     font=f_ov
                 )
 
-                if bbox[2] - bbox[0] <= CONTENT_WIDTH:
+                if bbox[2] - bbox[0] <= overview_width:
                     line = test
                 else:
 
@@ -681,16 +781,16 @@ class MediaGenerator:
             if line:
                 lines.append(line)
 
-            # Projectivy background:
-            # keep description short.
-            lines = lines[:3]
+            lines = lines[:_g("overview", "max_lines", 3)]
+
+            overview_y = _el_y("overview")
 
             for line in lines:
 
                 draw.text(
                     (
-                        LEFT + 2,
-                        current_y + 2
+                        overview_x + _g("overview", "shadow_offset_x", 2),
+                        overview_y + _g("overview", "shadow_offset_y", 2)
                     ),
                     line,
                     font=f_ov,
@@ -699,15 +799,15 @@ class MediaGenerator:
 
                 draw.text(
                     (
-                        LEFT,
-                        current_y
+                        overview_x,
+                        overview_y
                     ),
                     line,
                     font=f_ov,
                     fill=(245, 245, 245, 245)
                 )
 
-                current_y += 62
+                overview_y += _g("overview", "line_spacing", 62)
 
         # ============================================================
         # SAVE
@@ -721,7 +821,7 @@ class MediaGenerator:
         image.convert("RGB").save(
             output_path,
             "JPEG",
-            quality=92,
+            quality=_g("output", "quality", 92),
             optimize=True
         )
 

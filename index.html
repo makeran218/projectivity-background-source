@@ -1,17 +1,1238 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-    <title>Wallpaper API</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MediaGenerator Image Settings</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  /* Top bar */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: #16213e;
+    border-bottom: 1px solid #0f3460;
+    height: 48px;
+  }
+  .topbar h1 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #e94560;
+  }
+  .topbar-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .btn {
+    padding: 6px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  .btn-primary { background: #e94560; color: white; }
+  .btn-primary:hover { background: #c73652; }
+  .btn-secondary { background: #0f3460; color: #e0e0e0; }
+  .btn-secondary:hover { background: #1a4a7a; }
+  .btn-success { background: #2ecc71; color: white; }
+  .btn-success:hover { background: #27ae60; }
+  .status-msg { font-size: 12px; color: #2ecc71; margin-left: 12px; }
+
+  /* Main layout */
+  .main {
+    display: flex;
+    height: calc(100vh - 48px);
+  }
+
+  /* Preview area */
+  .preview-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    overflow: auto;
+    background: #0d1117;
+    position: relative;
+  }
+  .preview-container {
+    position: relative;
+    display: inline-block;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    border-radius: 4px;
+    overflow: hidden;
+    background: #000;
+  }
+  .preview-canvas {
+    display: block;
+    max-width: 100%;
+    max-height: calc(100vh - 120px);
+  }
+
+  /* Overlay elements */
+  .overlay-element {
+    position: absolute;
+    cursor: move;
+    user-select: none;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    transition: outline-color 0.15s;
+  }
+  .overlay-element:hover {
+    outline-color: rgba(233,69,96,0.4);
+  }
+  .overlay-element.selected {
+    outline-color: #e94560;
+  }
+  .overlay-element.dragging {
+    opacity: 0.85;
+    z-index: 100;
+  }
+
+  /* Resize handle */
+  .resize-handle {
+    position: absolute;
+    bottom: -6px;
+    right: -6px;
+    width: 12px;
+    height: 12px;
+    background: #e94560;
+    border: 2px solid white;
+    border-radius: 50%;
+    cursor: nwse-resize;
+    z-index: 10;
+  }
+
+  /* Zoom controls */
+  .zoom-controls {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 4px;
+    background: rgba(22,33,62,0.9);
+    border-radius: 8px;
+    padding: 4px;
+  }
+  .zoom-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0f3460;
+    border: none;
+    color: #e0e0e0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+  }
+  .zoom-btn:hover { background: #1a4a7a; }
+  .zoom-level {
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    font-size: 12px;
+    color: #8899aa;
+  }
+
+  /* Settings panel */
+  .settings-panel {
+    width: 400px;
+    background: #16213e;
+    border-left: 1px solid #0f3460;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .settings-tabs {
+    display: flex;
+    overflow-x: auto;
+    background: #0f3460;
+    border-bottom: 1px solid #1a4a7a;
+    flex-shrink: 0;
+  }
+  .settings-tabs button {
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    color: #8899aa;
+    cursor: pointer;
+    font-size: 12px;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .settings-tabs button:hover { color: #e0e0e0; background: rgba(233,69,96,0.1); }
+  .settings-tabs button.active { color: #e94560; border-bottom-color: #e94560; background: rgba(233,69,96,0.05); }
+  .settings-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+  }
+  .settings-content::-webkit-scrollbar { width: 6px; }
+  .settings-content::-webkit-scrollbar-track { background: #16213e; }
+  .settings-content::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
+
+  /* Setting groups */
+  .setting-group {
+    margin-bottom: 12px;
+    background: #1a1a2e;
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .setting-group-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #e94560;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  .setting-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .setting-row:last-child { margin-bottom: 0; }
+  .setting-label {
+    width: 110px;
+    font-size: 12px;
+    color: #8899aa;
+    flex-shrink: 0;
+  }
+  .setting-input { flex: 1; }
+  .setting-input input[type="number"],
+  .setting-input input[type="text"] {
+    width: 100%;
+    padding: 4px 8px;
+    background: #0f3460;
+    border: 1px solid #1a4a7a;
+    border-radius: 4px;
+    color: #e0e0e0;
+    font-size: 12px;
+    outline: none;
+  }
+  .setting-input input:focus { border-color: #e94560; }
+  .setting-input input[type="range"] {
+    width: 100%;
+    accent-color: #e94560;
+  }
+  .setting-input .range-value {
+    font-size: 11px;
+    color: #e94560;
+    text-align: right;
+    margin-top: 2px;
+  }
+  .setting-input .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .setting-input input[type="checkbox"] { accent-color: #e94560; }
+
+  /* Upload area */
+  .upload-area {
+    border: 2px dashed #0f3460;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .upload-area:hover {
+    border-color: #e94560;
+    background: rgba(233,69,96,0.05);
+  }
+  .upload-area p { font-size: 12px; color: #8899aa; }
+  .upload-area .filename { font-size: 11px; color: #2ecc71; margin-top: 4px; }
+
+  /* Loading overlay */
+  .loading {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(13,17,23,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+  }
+  .loading.hidden { display: none; }
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #0f3460;
+    border-top-color: #e94560;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
 </head>
-
 <body>
-    <script>
-        fetch('api.json').then(r => r.json()).then(data => {
-            const random = data[Math.floor(Math.random() * data.length)];
-            document.body.innerHTML = `<pre>${JSON.stringify(random, null, 4)}</pre>`;
-        });
-    </script>
-</body>
 
+<!-- Top bar -->
+<div class="topbar">
+  <div style="display:flex;align-items:center;">
+    <h1>🎬 MediaGenerator Image Settings</h1>
+    <span class="status-msg" id="statusMsg"></span>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-secondary" onclick="loadConfig()">Load Config</button>
+    <button class="btn btn-success" onclick="saveConfig()">💾 Save</button>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <!-- Preview area -->
+  <div class="preview-area" id="previewArea">
+    <div class="preview-container" id="previewContainer">
+      <canvas class="preview-canvas" id="previewCanvas"></canvas>
+    </div>
+    <div class="zoom-controls">
+      <button class="zoom-btn" onclick="zoomOut()">−</button>
+      <span class="zoom-level" id="zoomLevel">5%</span>
+      <button class="zoom-btn" onclick="zoomIn()">+</button>
+      <button class="zoom-btn" onclick="zoomFit()" title="Fit to screen">⊡</button>
+    </div>
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+    </div>
+  </div>
+
+  <!-- Settings panel -->
+  <div class="settings-panel">
+    <div class="settings-tabs" id="settingsTabs">
+      <button class="active" data-tab="canvas">Canvas</button>
+      <button data-tab="gradient">Gradient</button>
+      <button data-tab="label">Label</button>
+      <button data-tab="logo">Logo</button>
+      <button data-tab="title">Title</button>
+      <button data-tab="metadata">Metadata</button>
+      <button data-tab="rating">Rating</button>
+      <button data-tab="overview">Overview</button>
+      <button data-tab="output">Output</button>
+    </div>
+    <div class="settings-content" id="settingsContent">
+      <!-- Settings rendered here -->
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// State
+// ============================================================
+let config = {};
+let zoom = 0.05;
+let bgImage = null;
+let serviceLogoImage = null;
+let titleLogoImage = null;
+
+// Element positions stored as percentages of canvas
+// Each element has: x%, y%, width%, height%
+let elements = {};
+
+const DEFAULTS = {
+  canvas: { width: 3840, height: 2160 },
+  gradient: { start_x: 0, end_x: 2100, max_alpha: 205 },
+  layout: { left_margin: 260, content_width: 1550, start_y: 250 },
+  label: { font_size: 42, spacing_after: 65 },
+  service_logo: { height: 75, spacing_after: 55 },
+  title_logo: { max_width: 1350, max_height: 420, spacing_after: 55 },
+  fallback_title: { max_font_size: 155, cjk_max_font_size: 125, min_font_size: 80, line_extra_spacing: 12, bottom_padding: 35 },
+  metadata: { font_size: 48, spacing_after: 85, cert_padding_x: 15, cert_padding_y: 20, cert_radius: 3, shadow_offset_x: 2, shadow_offset_y: 4 },
+  rating: { star_cx_offset: 25, star_cy_offset: 32, outer_radius: 28, inner_radius: 12, text_x_offset: 70, spacing_after: 100, font_size: 58 },
+  overview: { font_size: 43, max_lines: 3, line_spacing: 62 },
+  output: { quality: 92, use_vignette: true }
+};
+
+// Default element positions (as percentages of canvas)
+const ELEMENT_DEFAULTS = {
+  label: { x: 6.75, y: 11.57, w: 15, h: 3, type: 'text', text: 'NETFLIX', color: '#ebebeb', fontSize: 42 },
+  service_logo: { x: 6.75, y: 14.58, w: 12, h: 3.47, type: 'image' },
+  title_logo: { x: 6.75, y: 17.59, w: 35, h: 19.44, type: 'image' },
+  title: { x: 6.75, y: 17.59, w: 35, h: 8, type: 'text', text: 'DUMMY SHOW', color: '#fff', fontSize: 155 },
+  metadata: { x: 6.75, y: 28, w: 40, h: 3, type: 'text', text: 'Action, Drama • 2024 • 2h 15m • PG-13', color: '#e1e1e1', fontSize: 48 },
+  rating: { x: 7.4, y: 32.41, w: 5, h: 3.7, type: 'star' },
+  overview: { x: 6.75, y: 37.04, w: 40, h: 8, type: 'text', text: 'A thrilling journey through uncharted territories where heroes must face their deepest fears...', color: '#f5f5f5', fontSize: 43 }
+};
+
+// Sample images
+let sampleBgPath = null;
+let sampleLogoPath = null;
+
+// Track which elements have been manually positioned/resized
+let manuallyAdjusted = {};
+
+// Title logo mode: 'image' or 'text'
+let titleLogoMode = 'image';
+
+// ============================================================
+// API
+// ============================================================
+async function api(path, method='GET', body=null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  return res.json();
+}
+
+async function loadConfig() {
+  try {
+    const data = await api('/api/config');
+    config = data.config || DEFAULTS;
+
+    // Restore saved element positions if available
+    const savedElements = data.elements;
+    if (savedElements) {
+      // Merge saved elements into existing elements
+      for (const key of Object.keys(savedElements)) {
+        if (savedElements[key]) {
+          elements[key] = { ...(elements[key] || {}), ...savedElements[key] };
+        }
+      }
+      // Only sync from config when there are NO saved elements
+      // (so the GUI doesn't overwrite user drag-and-drop positions)
+      const hasSavedElements = Object.keys(savedElements).some(
+        k => savedElements[k] && savedElements[k].x !== undefined
+      );
+      if (!hasSavedElements) {
+        syncElementsFromConfig();
+      }
+    } else {
+      syncElementsFromConfig();
+    }
+
+    // Load sample images
+    await loadSampleImages();
+
+    showStatus('Config loaded');
+    buildSettingsUI();
+    renderPreview();
+  } catch (e) {
+    showStatus('Error loading config: ' + e.message);
+  }
+}
+
+async function loadSampleImages() {
+  try {
+    const data = await api('/api/sample');
+    if (data.bg) {
+      sampleBgPath = data.bg;
+      const img = new Image();
+      img.onload = () => { bgImage = img; renderPreview(); };
+      img.src = data.bg;
+    }
+    if (data.logo) {
+      sampleLogoPath = data.logo;
+      const img = new Image();
+      img.onload = () => { titleLogoImage = img; renderPreview(); };
+      img.src = data.logo;
+    }
+    // Load service logo (netflix default)
+    const img = new Image();
+    img.onload = () => { serviceLogoImage = img; renderPreview(); };
+    img.onerror = () => { console.warn('Failed to load netflix_logo.png'); };
+    img.src = 'netflix_logo.png';
+  } catch (e) {
+    console.warn('Failed to load sample images:', e);
+  }
+}
+
+// Convert sequential layout values to element positions
+async function saveConfig() {
+  try {
+    // config already contains the sequential layout values from the settings panel.
+    // elements contains the last-guessed positions from dragging (for GUI persistence).
+    // We save both so the GUI can restore element positions on reload.
+    await api('/api/save', 'POST', { config, elements });
+    showStatus('✓ Saved to image_settings.json');
+    setTimeout(() => document.getElementById('statusMsg').textContent = '', 3000);
+  } catch (e) {
+    showStatus('Error saving: ' + e.message);
+  }
+}
+
+function showStatus(msg) {
+  document.getElementById('statusMsg').textContent = msg;
+}
+
+// ============================================================
+// Settings UI
+// ============================================================
+const TABS = {
+  canvas: [
+    { section: 'Canvas', fields: [
+      { key: 'canvas.width', label: 'Width', type: 'number', min: 100, max: 8000 },
+      { key: 'canvas.height', label: 'Height', type: 'number', min: 100, max: 8000 }
+    ]}
+  ],
+  gradient: [
+    { section: 'Gradient Overlay', fields: [
+      { key: 'gradient.end_x', label: 'Fade End X', type: 'number', min: 0, max: 10000 },
+      { key: 'gradient.max_alpha', label: 'Max Alpha', type: 'range', min: 0, max: 255, step: 1 }
+    ]}
+  ],
+  label: [
+    { section: 'Service Label', fields: [
+      { key: 'label.font_size', label: 'Font Size', type: 'number', min: 10, max: 200 },
+      { key: 'label.spacing_after', label: 'Spacing After', type: 'number', min: 0, max: 500 }
+    ]}
+  ],
+  logo: [
+    { section: 'Service Logo', fields: [
+      { key: 'service_logo.height', label: 'Height', type: 'number', min: 0, max: 500 },
+      { key: 'service_logo.spacing_after', label: 'Spacing After', type: 'number', min: 0, max: 500 }
+    ]},
+    { section: 'Title Logo', fields: [
+      { key: 'title_logo.max_width', label: 'Max Width', type: 'number', min: 0, max: 4000 },
+      { key: 'title_logo.max_height', label: 'Max Height', type: 'number', min: 0, max: 2000 },
+      { key: 'title_logo.spacing_after', label: 'Spacing After', type: 'number', min: 0, max: 500 }
+    ]},
+    { section: 'Title Mode', fields: [
+      { key: 'title_logo_mode', label: 'Type', type: 'select', options: ['image', 'text'] }
+    ]}
+  ],
+  title: [
+    { section: 'Fallback Title', fields: [
+      { key: 'fallback_title.max_font_size', label: 'Max Font Size', type: 'number', min: 20, max: 500 },
+      { key: 'fallback_title.cjk_max_font_size', label: 'CJK Max Font Size', type: 'number', min: 20, max: 500 },
+      { key: 'fallback_title.min_font_size', label: 'Min Font Size', type: 'number', min: 10, max: 500 },
+      { key: 'fallback_title.line_extra_spacing', label: 'Line Spacing', type: 'number', min: 0, max: 100 },
+      { key: 'fallback_title.bottom_padding', label: 'Bottom Padding', type: 'number', min: 0, max: 500 }
+    ]}
+  ],
+  metadata: [
+    { section: 'Metadata', fields: [
+      { key: 'metadata.font_size', label: 'Font Size', type: 'number', min: 10, max: 200 },
+      { key: 'metadata.spacing_after', label: 'Spacing After', type: 'number', min: 0, max: 500 },
+      { key: 'metadata.cert_padding_x', label: 'Cert Pad X', type: 'number', min: 0, max: 100 },
+      { key: 'metadata.cert_padding_y', label: 'Cert Pad Y', type: 'number', min: 0, max: 100 },
+      { key: 'metadata.cert_radius', label: 'Cert Radius', type: 'number', min: 0, max: 50 },
+      { key: 'metadata.shadow_offset_x', label: 'Shadow X', type: 'number', min: 0, max: 50 },
+      { key: 'metadata.shadow_offset_y', label: 'Shadow Y', type: 'number', min: 0, max: 50 }
+    ]}
+  ],
+  rating: [
+    { section: 'Rating Star', fields: [
+      { key: 'rating.star_cx_offset', label: 'CX Offset', type: 'number', min: 0, max: 500 },
+      { key: 'rating.star_cy_offset', label: 'CY Offset', type: 'number', min: 0, max: 500 },
+      { key: 'rating.outer_radius', label: 'Outer Radius', type: 'number', min: 5, max: 100 },
+      { key: 'rating.inner_radius', label: 'Inner Radius', type: 'number', min: 1, max: 50 },
+      { key: 'rating.text_x_offset', label: 'Text X Offset', type: 'number', min: 0, max: 500 },
+      { key: 'rating.spacing_after', label: 'Spacing After', type: 'number', min: 0, max: 500 },
+      { key: 'rating.font_size', label: 'Font Size', type: 'number', min: 10, max: 200 }
+    ]}
+  ],
+  overview: [
+    { section: 'Overview', fields: [
+      { key: 'overview.font_size', label: 'Font Size', type: 'number', min: 10, max: 200 },
+      { key: 'overview.max_lines', label: 'Max Lines', type: 'number', min: 0, max: 10 },
+      { key: 'overview.line_spacing', label: 'Line Spacing', type: 'number', min: 0, max: 200 }
+    ]}
+  ],
+  output: [
+    { section: 'Output', fields: [
+      { key: 'output.quality', label: 'JPEG Quality', type: 'range', min: 1, max: 100, step: 1 },
+      { key: 'output.use_vignette', label: 'Use Vignette', type: 'checkbox' }
+    ]}
+  ]
+};
+
+function buildSettingsUI() {
+  const container = document.getElementById('settingsContent');
+  container.innerHTML = '';
+
+  // Upload area
+  const upload = document.createElement('div');
+  upload.className = 'upload-area';
+  upload.innerHTML = '<p>📁 Upload bg.jpg & logo.png</p><p class="filename">Drag & drop or click</p>';
+  upload.onclick = () => document.getElementById('fileInput').click();
+  upload.ondragover = (e) => { e.preventDefault(); upload.style.borderColor = '#e94560'; };
+  upload.ondragleave = () => { upload.style.borderColor = '#0f3460'; };
+  upload.ondrop = (e) => {
+    e.preventDefault();
+    upload.style.borderColor = '#0f3460';
+    handleFileUpload(e.dataTransfer.files);
+  };
+  container.appendChild(upload);
+
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.id = 'fileInput';
+  fileInput.style.display = 'none';
+  fileInput.multiple = true;
+  fileInput.accept = '.jpg,.jpeg,.png,.webp';
+  fileInput.onchange = (e) => handleFileUpload(e.target.files);
+  container.appendChild(fileInput);
+
+  // Tabs
+  const tabsDiv = document.getElementById('settingsTabs');
+  tabsDiv.querySelectorAll('button').forEach(btn => {
+    btn.onclick = () => switchTab(btn.dataset.tab);
+  });
+
+  switchTab('canvas');
+}
+
+async function handleFileUpload(files) {
+  for (const file of files) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const name = file.name.toLowerCase();
+      if (name.includes('bg')) {
+        bgImage = new Image();
+        bgImage.src = e.target.result;
+        bgImage.onload = () => {
+          config.canvas.width = bgImage.width;
+          config.canvas.height = bgImage.height;
+          showStatus('✓ Background: ' + file.name);
+          renderPreview();
+        };
+      } else if (name.includes('logo')) {
+        titleLogoImage = new Image();
+        titleLogoImage.src = e.target.result;
+        titleLogoImage.onload = () => {
+          showStatus('✓ Title logo: ' + file.name);
+          renderPreview();
+        };
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function switchTab(tabName) {
+  document.querySelectorAll('.settings-tabs button').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.settings-tabs button[data-tab="${tabName}"]`)?.classList.add('active');
+
+  const container = document.getElementById('settingsContent');
+  const uploadArea = container.querySelector('.upload-area');
+  container.innerHTML = '';
+  if (uploadArea) container.appendChild(uploadArea);
+
+  const tabData = TABS[tabName];
+  if (!tabData) return;
+
+  tabData.forEach(group => {
+    const div = document.createElement('div');
+    div.className = 'setting-group';
+
+    const title = document.createElement('div');
+    title.className = 'setting-group-title';
+    title.textContent = group.section;
+    div.appendChild(title);
+
+    group.fields.forEach(field => {
+      const row = document.createElement('div');
+      row.className = 'setting-row';
+
+      const label = document.createElement('div');
+      label.className = 'setting-label';
+      label.textContent = field.label;
+      row.appendChild(label);
+
+      const input = document.createElement('div');
+      input.className = 'setting-input';
+
+      if (field.type === 'checkbox') {
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = getNested(config, field.key) || false;
+        cb.onchange = () => {
+          setNested(config, field.key, cb.checked);
+          syncElementsFromConfig();
+          renderPreview();
+        };
+        input.appendChild(cb);
+      } else if (field.type === 'select') {
+        const sel = document.createElement('select');
+        sel.style.cssText = 'width:100%;padding:4px 8px;background:#0f3460;border:1px solid #1a4a7a;border-radius:4px;color:#e0e0e0;font-size:12px;outline:none;';
+        const currentVal = window.titleLogoMode || 'image';
+        field.options.forEach(opt => {
+          const option = document.createElement('option');
+          option.value = opt;
+          option.textContent = opt.charAt(0).toUpperCase() + opt.slice(1);
+          option.selected = (opt === currentVal);
+          sel.appendChild(option);
+        });
+        sel.onchange = () => {
+          window.titleLogoMode = sel.value;
+          renderPreview();
+        };
+        input.appendChild(sel);
+      } else if (field.type === 'range') {
+        const range = document.createElement('input');
+        range.type = 'range';
+        range.min = field.min;
+        range.max = field.max;
+        range.step = field.step || 1;
+        range.value = getNested(config, field.key) || field.min;
+        const valDisplay = document.createElement('div');
+        valDisplay.className = 'range-value';
+        valDisplay.textContent = range.value;
+        range.oninput = () => {
+          valDisplay.textContent = range.value;
+          setNested(config, field.key, parseInt(range.value));
+          syncElementsFromConfig();
+          renderPreview();
+        };
+        input.appendChild(range);
+        input.appendChild(valDisplay);
+      } else {
+        const num = document.createElement('input');
+        num.type = 'number';
+        num.value = getNested(config, field.key) || 0;
+        if (field.min !== undefined) num.min = field.min;
+        if (field.max !== undefined) num.max = field.max;
+        num.onchange = () => {
+          setNested(config, field.key, parseInt(num.value) || 0);
+          syncElementsFromConfig();
+          renderPreview();
+        };
+        input.appendChild(num);
+      }
+
+      row.appendChild(input);
+      div.appendChild(row);
+    });
+
+    container.appendChild(div);
+  });
+}
+
+function getNested(obj, key) {
+  return key.split('.').reduce((o, k) => o?.[k], obj);
+}
+
+function setNested(obj, key, value) {
+  const parts = key.split('.');
+  let target = obj;
+  for (let i = 0; i < parts.length - 1; i++) {
+    target = target[parts[i]];
+  }
+  target[parts[parts.length - 1]] = value;
+}
+
+// ============================================================
+// Sync element positions from sequential config values
+// Called when config values change (settings panel inputs)
+// so the preview always matches what main.py produces.
+// ============================================================
+function syncElementsFromConfig() {
+  const cw = config.canvas.width || 3840;
+  const ch = config.canvas.height || 2160;
+
+  const LEFT = config.layout?.left_margin ?? 260;
+  let currentY = config.layout?.start_y ?? 250;
+
+  const labelH = Math.round((config.label?.font_size || 42) * 1.2);
+  const svcLogoH = config.service_logo?.height ?? 75;
+  const titleLogoH = config.title_logo?.max_height ?? 420;
+  const metadataH = Math.round((config.metadata?.font_size || 48) * 1.2);
+  const ratingH = Math.round((config.rating?.font_size || 58) * 1.2);
+
+  function setEl(type, x, y, w, h, extra = {}) {
+    // Skip syncing if this element was manually positioned/resized
+    if (manuallyAdjusted[type]) return;
+    elements[type] = {
+      ...(elements[type] || {}),
+      ...ELEMENT_DEFAULTS[type],
+      x, y, w, h,
+      ...extra
+    };
+  }
+
+  setEl('label', LEFT, currentY, (15 / 100) * cw, labelH, {
+    text: 'NETFLIX', color: '#ebebeb', fontSize: config.label?.font_size ?? 42
+  });
+  currentY += labelH + (config.label?.spacing_after ?? 65);
+
+  setEl('service_logo', LEFT, currentY, (12 / 100) * cw, svcLogoH, {
+    type: 'image'
+  });
+  currentY += svcLogoH + (config.service_logo?.spacing_after ?? 55);
+
+  setEl('title_logo', LEFT, currentY, (35 / 100) * cw, titleLogoH);
+  currentY += titleLogoH + (config.title_logo?.spacing_after ?? 55);
+
+  setEl('metadata', LEFT, currentY, (40 / 100) * cw, metadataH, {
+    text: 'Action, Drama \u2022 2024 \u2022 2h 15m \u2022 PG-13',
+    color: '#e1e1e1', fontSize: config.metadata?.font_size ?? 48
+  });
+  currentY += metadataH + (config.metadata?.spacing_after ?? 85);
+
+  const ratingX = LEFT + (config.rating?.star_cx_offset ?? 25);
+  setEl('rating', ratingX, currentY, (5 / 100) * cw, ratingH, { type: 'star' });
+  currentY += ratingH + (config.rating?.spacing_after ?? 100);
+
+  setEl('overview', LEFT, currentY, (40 / 100) * cw, Math.round((config.overview?.font_size || 43) * 1.2), {
+    text: 'A thrilling journey through uncharted territories where heroes must face their deepest fears...',
+    color: '#f5f5f5', fontSize: config.overview?.font_size ?? 43
+  });
+}
+
+// ============================================================
+// Preview rendering
+// ============================================================
+function renderPreview() {
+  const container = document.getElementById('previewContainer');
+  const canvas = document.getElementById('previewCanvas');
+
+  // Remove old overlays
+  container.querySelectorAll('.overlay-element').forEach(el => el.remove());
+
+  const cw = config.canvas.width || 3840;
+  const ch = config.canvas.height || 2160;
+
+  // Calculate display size
+  const area = document.getElementById('previewArea');
+  const maxW = area.clientWidth - 40;
+  const maxH = area.clientHeight - 80;
+  const scale = Math.min(maxW / cw, maxH / ch, 1);
+  const dw = Math.floor(cw * scale);
+  const dh = Math.floor(ch * scale);
+
+  canvas.width = dw;
+  canvas.height = dh;
+  container.style.width = dw + 'px';
+  container.style.height = dh + 'px';
+
+  const ctx = canvas.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, dw, dh);
+
+  if (bgImage) {
+    const targetRatio = cw / ch;
+    const imgRatio = bgImage.width / bgImage.height;
+    let sx, sy, sw, sh;
+    if (imgRatio > targetRatio) {
+      sw = bgImage.height * targetRatio;
+      sh = bgImage.height;
+      sx = (bgImage.width - sw) / 2;
+      sy = 0;
+    } else {
+      sw = bgImage.width;
+      sh = bgImage.width / targetRatio;
+      sx = 0;
+      sy = (bgImage.height - sh) / 2;
+    }
+    ctx.drawImage(bgImage, sx, sy, sw, sh, 0, 0, dw, dh);
+  } else {
+    const grad = ctx.createLinearGradient(0, 0, dw, 0);
+    grad.addColorStop(0, '#222');
+    grad.addColorStop(1, '#111');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, dw, dh);
+  }
+
+  // Gradient overlay
+  const gradEndX = (config.gradient?.end_x || 2100) * scale;
+  const gradAlpha = (config.gradient?.max_alpha || 205) / 255;
+  if (gradEndX > 0) {
+    const grad = ctx.createLinearGradient(0, 0, gradEndX, 0);
+    grad.addColorStop(0, `rgba(0,0,0,${gradAlpha})`);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, gradEndX, dh);
+  }
+
+  // Render each element from the elements object.
+  // Elements are kept in sync with config only when the settings panel
+  // values change (via syncElementsFromConfig).  Dragging elements
+  // updates the elements object locally without touching the config.
+  Object.keys(ELEMENT_DEFAULTS).forEach(type => {
+    const elData = elements[type] || ELEMENT_DEFAULTS[type];
+
+    // Element positions are stored as canvas pixels; convert to display pixels
+    const elX = elData.x || 0;
+    const elY = elData.y || 0;
+    const elW = elData.w || 0;
+    const elH = elData.h || 0;
+    const dispX = (elX / cw) * dw;
+    const dispY = (elY / ch) * dh;
+    const dispW = (elW / cw) * dw;
+    const dispH = (elH / ch) * dh;
+
+    if (elData.type === 'text') {
+      // Skip fallback title text in both modes — it's rendered in title_logo branch
+      if (type === 'title') return;
+      const fontSize = (elData.fontSize || 48) * scale;
+      const el = createOverlayElement(type, dispX, dispY, dispW, dispH, `font-size:${fontSize}px;color:${elData.color};font-family:sans-serif;font-weight:bold;text-shadow:2px 2px 4px rgba(0,0,0,0.8);display:flex;align-items:center;padding:0 8px;`);
+      el.textContent = elData.text;
+      container.appendChild(el);
+    } else if (elData.type === 'image') {
+      // When in text mode, render title text at title_logo position instead
+      if (type === 'title_logo' && titleLogoMode === 'text') {
+        const titleEl = elements.title || ELEMENT_DEFAULTS.title;
+        if (titleEl && titleEl.text) {
+          const fontSize = (titleEl.fontSize || 155) * scale;
+          const el = createOverlayElement('title', dispX, dispY, dispW, dispH, `font-size:${fontSize}px;color:${titleEl.color || '#fff'};font-family:sans-serif;font-weight:bold;text-shadow:2px 2px 4px rgba(0,0,0,0.8);display:flex;align-items:center;padding:0 8px;`);
+          el.textContent = titleEl.text;
+          container.appendChild(el);
+        }
+        return;
+      }
+      // When in image mode, skip title_logo if no image loaded
+      if (type === 'title_logo' && titleLogoMode === 'image' && !titleLogoImage) return;
+      let img = null;
+      if (type === 'title_logo') {
+        img = titleLogoImage;
+      } else if (type === 'service_logo') {
+        img = serviceLogoImage;
+      }
+      if (img) {
+        const el = createOverlayElement(type, dispX, dispY, dispW, dispH, 'display:flex;align-items:center;justify-content:center;');
+        const imgEl = document.createElement('img');
+        imgEl.src = img.src;
+        imgEl.style.width = '100%';
+        imgEl.style.height = '100%';
+        imgEl.style.objectFit = 'contain';
+        el.appendChild(imgEl);
+        container.appendChild(el);
+      }
+    } else if (elData.type === 'star') {
+      // Draw star on canvas
+      const ratingY = dispY + dispH / 2;
+      const starCx = dispX + 20 * scale;
+      const starCy = ratingY;
+      const starR = (config.rating?.outer_radius || 28) * scale;
+      drawStar(ctx, starCx, starCy, starR, starR * 0.43, 5);
+      ctx.fillStyle = '#ffd250';
+      ctx.fill();
+
+      const ratingTextSize = (config.rating?.font_size || 58) * scale;
+      const ratingEl = createOverlayElement('rating', dispX + 50 * scale, dispY, 60 * scale, ratingTextSize + 10 * scale, `font-size:${ratingTextSize}px;color:#fff;font-family:sans-serif;font-weight:bold;display:flex;align-items:center;`);
+      ratingEl.textContent = '8.5';
+      container.appendChild(ratingEl);
+    }
+  });
+
+  // Update zoom display
+  document.getElementById('zoomLevel').textContent = Math.round(scale * 100) + '%';
+}
+
+// ============================================================
+// Global drag/resize state (single handler, no stale closures)
+// ============================================================
+let dragState = null; // { type, startX, startY, origX, origY }
+let resizeState = null; // { type, startW, startH, startSizeX, startSizeY }
+
+function handleDragStart(e) {
+  const el = e.target.closest('.overlay-element');
+  if (!el || e.target.classList.contains('resize-handle')) return;
+  dragState = {
+    type: el.dataset.type,
+    startX: e.clientX,
+    startY: e.clientY,
+    origX: parseFloat(el.style.left),
+    origY: parseFloat(el.style.top)
+  };
+  el.classList.add('dragging', 'selected');
+  e.preventDefault();
+}
+
+function handleDragMove(e) {
+  if (!dragState) return;
+  const dx = e.clientX - dragState.startX;
+  const dy = e.clientY - dragState.startY;
+  const el = document.querySelector(`.overlay-element[data-type="${dragState.type}"]`);
+  if (!el) { dragState = null; return; }
+  el.style.left = (dragState.origX + dx) + 'px';
+  el.style.top = (dragState.origY + dy) + 'px';
+}
+
+function handleDragEnd() {
+  if (!dragState) return;
+  const el = document.querySelector(`.overlay-element[data-type="${dragState.type}"]`);
+  if (el) el.classList.remove('dragging');
+  updateConfigFromDrag(dragState.type);
+  dragState = null;
+}
+
+function handleResizeStart(e) {
+  if (!e.target.classList.contains('resize-handle')) return;
+  const el = e.target.closest('.overlay-element');
+  if (!el) return;
+  resizeState = {
+    type: el.dataset.type,
+    startW: parseFloat(el.style.width),
+    startH: parseFloat(el.style.height),
+    startSizeX: e.clientX,
+    startSizeY: e.clientY
+  };
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+function handleResizeMove(e) {
+  if (!resizeState) return;
+  const dx = e.clientX - resizeState.startSizeX;
+  const dy = e.clientY - resizeState.startSizeY;
+  const el = document.querySelector(`.overlay-element[data-type="${resizeState.type}"]`);
+  if (!el) { resizeState = null; return; }
+  el.style.width = Math.max(20, resizeState.startW + dx) + 'px';
+  el.style.height = Math.max(10, resizeState.startH + dy) + 'px';
+}
+
+function handleResizeEnd() {
+  if (!resizeState) return;
+  updateConfigFromResize(resizeState.type);
+  resizeState = null;
+}
+
+// Attach global handlers once (no per-element listeners)
+document.addEventListener('mousedown', (e) => {
+  if (e.target.classList.contains('resize-handle')) {
+    handleResizeStart(e);
+  } else {
+    handleDragStart(e);
+  }
+});
+document.addEventListener('mousemove', (e) => {
+  if (resizeState) handleResizeMove(e);
+  else handleDragMove(e);
+});
+document.addEventListener('mouseup', () => {
+  if (resizeState) handleResizeEnd();
+  else handleDragEnd();
+});
+
+// ============================================================
+// Create overlay element (no listeners — uses global handlers)
+// ============================================================
+function createOverlayElement(type, x, y, w, h, style) {
+  const el = document.createElement('div');
+  el.className = 'overlay-element';
+  el.dataset.type = type;
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  el.style.width = w + 'px';
+  el.style.height = h + 'px';
+  el.style.cssText += style;
+
+  // Click to select (no mousedown conflict with global drag handler)
+  el.addEventListener('click', (e) => {
+    document.querySelectorAll('.overlay-element.selected').forEach(item => item.classList.remove('selected'));
+    el.classList.add('selected');
+    showElementSettings(type);
+  });
+
+  // Resize handle
+  const handle = document.createElement('div');
+  handle.className = 'resize-handle';
+  el.appendChild(handle);
+
+  return el;
+}
+
+// Update element positions from drag (GUI preview only).
+// We do NOT convert to sequential layout values here because free-form
+// drag positions cannot be meaningfully mapped back to the sequential
+// layout model that main.py uses (start_y, spacing_after, etc.).
+function updateConfigFromDrag(type) {
+  const cw = config.canvas.width || 3840;
+  const ch = config.canvas.height || 2160;
+  const area = document.getElementById('previewArea');
+  const maxW = area.clientWidth - 40;
+  const maxH = area.clientHeight - 80;
+  const scale = Math.min(maxW / cw, maxH / ch, 1);
+  const dw = Math.floor(cw * scale);
+  const dh = Math.floor(ch * scale);
+
+  const el = document.querySelector(`.overlay-element[data-type="${type}"]`);
+  if (!el) return;
+
+  const currentX = parseFloat(el.style.left);
+  const currentY = parseFloat(el.style.top);
+
+  // Convert display pixels to canvas pixels
+  const newCanvasX = (currentX / dw) * cw;
+  const newCanvasY = (currentY / dh) * ch;
+
+  elements[type] = { ...elements[type], x: Math.round(newCanvasX), y: Math.round(newCanvasY) };
+  manuallyAdjusted[type] = true;
+}
+
+// Update element dimensions from resize (GUI preview only).
+function updateConfigFromResize(type) {
+  const cw = config.canvas.width || 3840;
+  const ch = config.canvas.height || 2160;
+  const area = document.getElementById('previewArea');
+  const maxW = area.clientWidth - 40;
+  const maxH = area.clientHeight - 80;
+  const scale = Math.min(maxW / cw, maxH / ch, 1);
+  const dw = Math.floor(cw * scale);
+  const dh = Math.floor(ch * scale);
+
+  const el = document.querySelector(`.overlay-element[data-type="${type}"]`);
+  if (!el) return;
+
+  const currentW = parseFloat(el.style.width);
+  const currentH = parseFloat(el.style.height);
+
+  // Convert display pixels to canvas pixels
+  const newCanvasW = (currentW / dw) * cw;
+  const newCanvasH = (currentH / dh) * ch;
+
+  const roundedW = Math.round(newCanvasW);
+  const roundedH = Math.round(newCanvasH);
+
+  elements[type] = { ...elements[type], w: roundedW, h: roundedH };
+  manuallyAdjusted[type] = true;
+
+  // Sync resize values back to config so settings panel stays in sync
+  if (type === 'title_logo') {
+    config.title_logo.max_width = roundedW;
+    config.title_logo.max_height = roundedH;
+  } else if (type === 'service_logo') {
+    config.service_logo.height = roundedH;
+  }
+}
+
+function drawStar(ctx, cx, cy, outerR, innerR, points) {
+  ctx.beginPath();
+  for (let i = 0; i < points * 2; i++) {
+    const angle = -Math.PI / 2 + (i * Math.PI / points);
+    const r = i % 2 === 0 ? outerR : innerR;
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+function showElementSettings(type) {
+  const container = document.getElementById('settingsContent');
+  const uploadArea = container.querySelector('.upload-area');
+  container.innerHTML = '';
+  if (uploadArea) container.appendChild(uploadArea);
+
+  const el = elements[type] || ELEMENT_DEFAULTS[type];
+  if (!el) return;
+
+  const div = document.createElement('div');
+  div.className = 'setting-group';
+
+  const title = document.createElement('div');
+  title.className = 'setting-group-title';
+  title.textContent = `${type} — Position & Size`;
+  div.appendChild(title);
+
+  // Position (pixels)
+  const cw = config.canvas.width || 3840;
+  const ch = config.canvas.height || 2160;
+  const area = document.getElementById('previewArea');
+  const maxW = area.clientWidth - 40;
+  const maxH = area.clientHeight - 80;
+  const scale = Math.min(maxW / cw, maxH / ch, 1);
+  const dw = Math.floor(cw * scale);
+  const dh = Math.floor(ch * scale);
+
+  // Convert canvas pixels to display pixels for the input fields
+  const px = (el.x / cw) * dw;
+  const py = (el.y / ch) * dh;
+  const pw = (el.w / cw) * dw;
+  const ph = (el.h / ch) * dh;
+
+  const fields = [
+    { label: 'X (px)', value: Math.round(px), key: 'px', step: 1 },
+    { label: 'Y (px)', value: Math.round(py), key: 'py', step: 1 },
+    { label: 'Width (px)', value: Math.round(pw), key: 'pw', step: 1 },
+    { label: 'Height (px)', value: Math.round(ph), key: 'ph', step: 1 }
+  ];
+
+  fields.forEach(field => {
+    const row = document.createElement('div');
+    row.className = 'setting-row';
+
+    const label = document.createElement('div');
+    label.className = 'setting-label';
+    label.textContent = field.label;
+    row.appendChild(label);
+
+    const input = document.createElement('div');
+    input.className = 'setting-input';
+
+    const num = document.createElement('input');
+    num.type = 'number';
+    num.value = field.value;
+    num.step = field.step || 1;
+    num.oninput = () => {
+      const val = parseInt(num.value) || 0;
+      // Convert display pixels back to canvas pixels
+      let newCanvas;
+      if (field.key === 'px') newCanvas = (val / dw) * cw;
+      else if (field.key === 'py') newCanvas = (val / dh) * ch;
+      else if (field.key === 'pw') newCanvas = (val / dw) * cw;
+      else if (field.key === 'ph') newCanvas = (val / dh) * ch;
+
+      const prop = field.key === 'px' ? 'x' : field.key === 'py' ? 'y' : field.key === 'pw' ? 'w' : 'h';
+      elements[type] = { ...elements[type], [prop]: Math.round(newCanvas) };
+      renderPreview();
+    };
+    input.appendChild(num);
+
+    row.appendChild(input);
+    div.appendChild(row);
+  });
+
+  container.appendChild(div);
+}
+
+function zoomIn() {
+  zoom = Math.min(zoom + 0.01, 1);
+  renderPreview();
+}
+
+function zoomOut() {
+  zoom = Math.max(zoom - 0.01, 0.01);
+  renderPreview();
+}
+
+function zoomFit() {
+  const area = document.getElementById('previewArea');
+  const cw = config.canvas.width || 3840;
+  const ch = config.canvas.height || 2160;
+  const maxW = area.clientWidth - 40;
+  const maxH = area.clientHeight - 80;
+  zoom = Math.min(maxW / cw, maxH / ch, 1);
+  renderPreview();
+}
+
+// ============================================================
+// Init
+// ============================================================
+window.addEventListener('load', async () => {
+  document.getElementById('loading').classList.remove('hidden');
+  await loadConfig();
+  document.getElementById('loading').classList.add('hidden');
+});
+
+window.addEventListener('resize', () => {
+  renderPreview();
+});
+</script>
+</body>
 </html>
