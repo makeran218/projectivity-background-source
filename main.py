@@ -98,7 +98,37 @@ def _el_x(type_key):
 
 
 def _el_y(type_key):
-    return _el(type_key, "y", _g("layout", "start_y", 250))
+    saved_y = _el(type_key, "y", None)
+    if saved_y is not None:
+        return saved_y
+    # Fallback: calculate sequential Y from config values
+    return _calculate_element_y(type_key)
+
+
+def _calculate_element_y(type_key):
+    """Calculate element Y position from sequential config when elements file is missing."""
+    LEFT = _g("layout", "left_margin", 260)
+    start_y = _g("layout", "start_y", 250)
+
+    # Order matters: label -> service_logo -> title_logo -> metadata -> rating -> overview
+    order = ["label", "service_logo", "title_logo", "metadata", "rating", "overview"]
+    current_y = start_y
+
+    for key in order:
+        if key == type_key:
+            return current_y
+        if key == "label":
+            current_y += int(_g("label", "font_size", 42) * 1.2) + _g("label", "spacing_after", 65)
+        elif key == "service_logo":
+            current_y += _g("service_logo", "height", 75) + _g("service_logo", "spacing_after", 55)
+        elif key == "title_logo":
+            current_y += _g("title_logo", "max_height", 420) + _g("title_logo", "spacing_after", 55)
+        elif key == "metadata":
+            current_y += int(_g("metadata", "font_size", 48) * 1.2) + _g("metadata", "spacing_after", 85)
+        elif key == "rating":
+            current_y += int(_g("rating", "font_size", 58) * 1.2) + _g("rating", "spacing_after", 100)
+        # overview is last, no spacing_after needed
+    return current_y
 
 
 def _el_w(type_key):
@@ -616,10 +646,15 @@ class MediaGenerator:
             x += get_width(text_font, part)
             if i < len(info_parts) - 1:
                 x += _g("metadata", "dot_spacing", 20)
-                parts_x.append(("•", x, True, False))
-                if is_cert:
+                # Look ahead: is the NEXT part the certification?
+                next_is_cert = (info_parts[i + 1] == certification)
+                if next_is_cert:
+                    # No dot before certification, just extra spacing
                     x += _g("metadata", "cert_dot_extra", 15)
-                x += get_width(dot_font, "•") + _g("metadata", "dot_width_extra", 30)
+                    x += _g("metadata", "dot_width_extra", 30)
+                else:
+                    parts_x.append(("•", x, True, False))
+                    x += get_width(dot_font, "•") + _g("metadata", "dot_width_extra", 30)
 
         meta_y = _el_y("metadata")
 
