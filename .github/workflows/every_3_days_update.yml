@@ -4,7 +4,7 @@ on:
     branches:
       - main
   schedule:
-    - cron: "0 0 * * *"
+    - cron: "0 0 */3 * *"  # every 3 days: 00:00 UTC on days 1, 4, 7, ... of each month
   workflow_dispatch:
 
 permissions:
@@ -42,12 +42,18 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
+      # The Pages site only needs what main.py produces with the committed
+      # settings: api.json + the generated images.
+      - name: Stage Pages content
+        run: |
+          mkdir -p site/tmdb_backgrounds
+          cp api.json site/
+          cp tmdb_backgrounds/*.jpg site/tmdb_backgrounds/
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # This uploads the current folder (including generated images)
-          # directly to the GitHub Pages web server.
-          path: "."
+          path: "site"
 
       - name: Deploy to GitHub Pages
         id: deployment

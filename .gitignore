@@ -1,3 +1,6 @@
 .env
 .venv/*
 tmdb_backgrounds/*
+__pycache__/*
+AGENTS.md
+sample/
